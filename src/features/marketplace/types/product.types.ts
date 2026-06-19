@@ -1,4 +1,4 @@
-export interface Product {
+export interface MarketplaceProduct {
   id: string;
   name: string;
   price: number;

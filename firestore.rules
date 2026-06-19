@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        getUserData().role == 'ADMIN';
+    }
+
+    // Profiles Collection
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow delete: if isAdmin();
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || isAuthenticated(); // Allow buyers/distributors to update order status
+      allow delete: if isAdmin();
+    }
+
+    // Products Collection
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || (isAuthenticated() && getUserData().role == 'DISTRIBUTOR');
+    }
+
+    // Audit Logs Collection
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // Allowed for system/admin audit trail recording
+      allow update, delete: if isAdmin();
+    }
+
+    // Disputes Collection
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Payouts Collection
+    match /payouts/{payoutId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Commission Tiers
+    match /commission_tiers/{tierId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Moderation Items Collection
+    match /moderation_items/{itemId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Settings Collection (e.g. settings/commission)
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Chat Rooms and Messages (general check)
+    match /rooms/{roomId} {
+      allow read, write: if isAuthenticated();
+      
+      match /typing/{user} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+    
+    match /messages/{messageId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /partnerships/{partnershipId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

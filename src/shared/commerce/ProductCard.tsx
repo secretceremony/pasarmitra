@@ -48,7 +48,7 @@ export function ProductCard({
         </button>
       </div>
 
-      <div className="p-8 flex-1 flex flex-col space-y-4">
+      <div className="p-5 sm:p-8 flex-1 flex flex-col space-y-4">
         <SupplierIdentity supplier={product.supplier} />
         
         <h4 className="text-xl font-black leading-tight group-hover:text-primary transition-colors line-clamp-2">
@@ -62,7 +62,7 @@ export function ProductCard({
 
         <Button
           onClick={() => onQuickAdd?.(product)}
-          className="w-full h-12 bg-secondary hover:bg-primary hover:text-primary-foreground font-black rounded-2xl transition-all opacity-0 group-hover:opacity-100 mt-4 shadow-xl"
+          className="w-full h-12 bg-secondary hover:bg-primary hover:text-primary-foreground font-black rounded-2xl transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 mt-4 shadow-xl"
         >
           Quick Add
         </Button>

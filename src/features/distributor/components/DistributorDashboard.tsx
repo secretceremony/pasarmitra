@@ -95,27 +95,27 @@ export const DistributorDashboard = () => {
                  <motion.div 
                    key={order.id}
                    whileHover={{ x: 4 }}
-                   className="p-6 bg-card border border-border/50 rounded-3xl flex items-center justify-between group hover:border-primary/30 transition-all"
+                   className="p-4 sm:p-6 bg-card border border-border/50 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-primary/30 transition-all"
                  >
-                   <div className="flex items-center gap-6">
+                   <div className="flex items-center gap-4 sm:gap-6 flex-1 min-w-0">
                       <div className={cn(
-                        "w-14 h-14 rounded-2xl flex items-center justify-center",
+                        "w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0",
                         order.status === 'Pending' ? "bg-amber-500/10 text-amber-500" :
                         order.status === 'Processing' ? "bg-blue-500/10 text-blue-500" :
                         "bg-emerald-500/10 text-emerald-500"
                       )}>
-                         <ShoppingBag size={24} />
+                         <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
-                      <div>
-                         <p className="font-black text-lg leading-tight uppercase tracking-tight">{order.id} • {order.buyer}</p>
-                         <div className="flex items-center gap-3 mt-1">
-                            <span className="text-sm font-bold text-muted-foreground">{order.time}</span>
+                      <div className="min-w-0">
+                         <p className="font-black text-sm sm:text-lg leading-tight uppercase tracking-tight truncate">{order.id} • {order.buyer}</p>
+                         <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            <span className="text-xs sm:text-sm font-bold text-muted-foreground">{order.time}</span>
                             <span className="text-muted-foreground/30">•</span>
-                            <span className="text-sm font-black text-primary">{order.amount}</span>
+                            <span className="text-xs sm:text-sm font-black text-primary">{order.amount}</span>
                          </div>
                       </div>
                    </div>
-                   <div className="flex items-center gap-4">
+                   <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
                       <span className={cn(
                         "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider",
                         order.status === 'Pending' ? "bg-amber-500/20 text-amber-500" :
@@ -124,7 +124,7 @@ export const DistributorDashboard = () => {
                       )}>
                         {order.status}
                       </span>
-                      <Button size="sm" variant="outline" className="rounded-xl font-bold opacity-0 group-hover:opacity-100">Process</Button>
+                      <Button size="sm" variant="outline" className="rounded-xl font-bold opacity-100 sm:opacity-0 sm:group-hover:opacity-100">Process</Button>
                    </div>
                  </motion.div>
                ))}
@@ -132,21 +132,21 @@ export const DistributorDashboard = () => {
           </div>
 
           {/* Performance Chart Placeholder */}
-          <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-6">
+          <div className="bg-card border border-border/50 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 space-y-6">
              <div className="flex items-center justify-between">
-                <h4 className="font-black text-xl">Inventory Turn Rate</h4>
+                <h4 className="font-black text-lg sm:text-xl">Inventory Turn Rate</h4>
                 <div className="flex gap-2">
                    <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-black rounded-lg uppercase">Daily</span>
                    <span className="px-3 py-1 bg-muted/40 text-muted-foreground text-xs font-black rounded-lg uppercase">Weekly</span>
                 </div>
              </div>
              <div className="h-64 w-full bg-muted/20 rounded-3xl flex items-center justify-center overflow-hidden relative">
-                <div className="absolute inset-0 flex items-end px-12 gap-6 opacity-20">
+                <div className="absolute inset-0 flex items-end px-4 sm:px-12 gap-2 sm:gap-6 opacity-20">
                    {[40, 70, 45, 90, 65, 80, 55, 75].map((h, i) => (
-                     <div key={i} className="flex-1 bg-primary rounded-t-xl" style={{ height: `${h}%` }} />
+                     <div key={i} className="flex-1 bg-primary rounded-t-lg sm:rounded-t-xl" style={{ height: `${h}%` }} />
                    ))}
                 </div>
-                <p className="text-muted-foreground font-bold relative z-10">Analytics Visualization Hooked</p>
+                <p className="text-muted-foreground font-bold relative z-10 text-sm sm:text-base">Analytics Visualization Hooked</p>
              </div>
           </div>
         </div>
@@ -158,7 +158,7 @@ export const DistributorDashboard = () => {
              <h3 className="text-2xl font-black tracking-tight">Open Negotiations</h3>
              <div className="grid gap-4">
                 {PENDING_NEGOTIATIONS.map((neg) => (
-                  <div key={neg.id} className="p-6 bg-primary/5 border border-primary/20 rounded-[2rem] space-y-4 shadow-sm">
+                  <div key={neg.id} className="p-4 sm:p-6 bg-primary/5 border border-primary/20 rounded-2xl sm:rounded-[2rem] space-y-4 shadow-sm">
                      <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
                            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground">
@@ -185,7 +185,7 @@ export const DistributorDashboard = () => {
           </div>
 
           {/* Quick Tasks */}
-          <div className="p-8 bg-card border border-border/50 rounded-[2.5rem] space-y-6">
+          <div className="p-6 sm:p-8 bg-card border border-border/50 rounded-3xl sm:rounded-[2.5rem] space-y-6">
              <h4 className="font-black text-xl">Operational Checklist</h4>
              <div className="space-y-4">
                 {[

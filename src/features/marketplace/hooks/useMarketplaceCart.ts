@@ -1,13 +1,13 @@
 import { useCallback } from 'react';
 import { useCartStore } from '../../../store/useCartStore';
 import { useNotificationStore } from '../../../store/useNotificationStore';
-import { Product } from '../types/product.types';
+import { MarketplaceProduct } from '../types/product.types';
 
 export function useMarketplaceCart() {
   const { addItem } = useCartStore();
   const { addNotification } = useNotificationStore();
 
-  const handleAddToCart = useCallback((product: Product) => {
+  const handleAddToCart = useCallback((product: MarketplaceProduct) => {
     addItem({
       id: product.id,
       name: product.name,

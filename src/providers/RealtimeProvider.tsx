@@ -1,5 +1,14 @@
 import React, { createContext, useContext, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  query, 
+  where, 
+  onSnapshot, 
+  deleteDoc 
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useRealtimeStore } from '../store/useRealtimeStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useAuthStore } from '../store/use-auth-store';
@@ -35,59 +44,113 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (!user) return;
 
-    // 1. Initialize Global Channel for Notifications and Presence
-    const channel = supabase.channel('global_updates', {
-      config: {
-        presence: {
-          key: user.id,
-        },
-      },
-    });
+    setConnected(true);
+    setLastError(null);
 
-    channel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
-        handleRealtimePayload({ ...payload, table: 'notifications' });
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.new.umkm_id === user.id || payload.new.distributor_id === user.id) {
-          const status = payload.new.status;
-          toast.info(`Order #${payload.new.id.slice(0, 8)} updated`, {
-            description: `Status changed to ${status}`,
-          });
-        }
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          setConnected(true);
-          setLastError(null);
-          
-          // Track presence
-          await channel.track({
+    // 1. Presence Heartbeat in Firestore
+    const presenceDocRef = doc(db, 'presence', user.id);
+    const setPresence = async (online: boolean) => {
+      try {
+        if (online) {
+          await setDoc(presenceDocRef, {
             user_id: user.id,
+            online: true,
             online_at: new Date().toISOString(),
           });
+        } else {
+          await deleteDoc(presenceDocRef);
         }
-        
-        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setConnected(false);
-          setLastError('Connection lost. Attempting to reconnect...');
+      } catch (err) {
+        console.error('Error updating presence:', err);
+      }
+    };
+
+    setPresence(true);
+
+    // Keep updating presence every 30 seconds
+    const presenceInterval = setInterval(() => {
+      setPresence(true);
+    }, 30000);
+
+    // 2. Subscribe to user's notifications
+    let isInitialNotifications = true;
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('user_id', '==', user.id)
+    );
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' && !isInitialNotifications) {
+          handleRealtimePayload({
+            table: 'notifications',
+            new: { id: change.doc.id, ...change.doc.data() },
+          });
         }
       });
+      isInitialNotifications = false;
+    });
+
+    // 3. Subscribe to user's order updates
+    let isInitialOrders = true;
+    // Subscribing to buyer order updates
+    const buyerOrdersQuery = query(
+      collection(db, 'orders'),
+      where('buyer_id', '==', user.id)
+    );
+    const unsubscribeBuyerOrders = onSnapshot(buyerOrdersQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified' && !isInitialOrders) {
+          const orderData = change.doc.data();
+          toast.info(`Order #${change.doc.id.slice(0, 8)} updated`, {
+            description: `Status changed to ${orderData.status}`,
+          });
+        }
+      });
+      isInitialOrders = false;
+    });
+
+    // Subscribing to distributor order updates
+    let isInitialDistributorOrders = true;
+    const distOrdersQuery = query(
+      collection(db, 'orders'),
+      where('distributor_id', '==', user.id)
+    );
+    const unsubscribeDistOrders = onSnapshot(distOrdersQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified' && !isInitialDistributorOrders) {
+          const orderData = change.doc.data();
+          toast.info(`Order #${change.doc.id.slice(0, 8)} updated`, {
+            description: `Status changed to ${orderData.status}`,
+          });
+        }
+      });
+      isInitialDistributorOrders = false;
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(presenceInterval);
+      setPresence(false);
+      unsubscribeNotifications();
+      unsubscribeBuyerOrders();
+      unsubscribeDistOrders();
+      setConnected(false);
     };
   }, [user, handleRealtimePayload, setConnected, setLastError]);
 
   const subscribeToTable = useCallback((table: string, callback: (payload: any) => void) => {
-    const channel = supabase
-      .channel(`table_updates_${table}_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table }, callback)
-      .subscribe();
+    const q = query(collection(db, table));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        callback({
+          table,
+          type: change.type.toUpperCase(),
+          new: { id: change.doc.id, ...change.doc.data() },
+          old: change.type === 'removed' ? { id: change.doc.id } : null
+        });
+      });
+    });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return unsubscribe;
   }, []);
 
   return (
@@ -104,3 +167,4 @@ export const useRealtime = () => {
   }
   return context;
 };
+

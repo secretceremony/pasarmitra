@@ -22,32 +22,12 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
-    // Demo Mode Bypass
-    if (email === 'admin@demo.com' || email === 'distributor@demo.com' || email === 'umkm@demo.com') {
-      setTimeout(() => {
-        const role = email.includes('admin') ? UserRole.ADMIN : 
-                     email.includes('distributor') ? UserRole.DISTRIBUTOR : UserRole.UMKM;
-        
-        useAuthStore.getState().setUser({
-          id: 'demo-user',
-          email: email,
-          role: role,
-          is_verified: true,
-          created_at: new Date().toISOString(),
-        });
-        useAuthStore.getState().setSession({ user: { id: 'demo-user' } });
-        useAuthStore.getState().setLoading(false);
-        navigate('/dashboard');
-      }, 1000);
-      return;
-    }
-
     try {
       await authService.login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      console.error('Login error details:', err);
-      setError(err instanceof Error ? err.message : 'Invalid login credentials');
+      console.error('Detail kesalahan login:', err);
+      setError(err instanceof Error ? err.message : 'Kredensial login tidak valid');
     } finally {
       setLoading(false);
     }
@@ -57,30 +37,32 @@ export default function Login() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex bg-primary flex-col justify-between p-12 text-primary-foreground relative overflow-hidden">
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-8">
-            <Store size={32} />
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 p-1 shadow-md">
+              <img src="/logo-PM.png" alt="Logo PasarMitra" className="w-full h-full object-contain" />
+            </div>
             <span className="text-2xl font-bold">PasarMitra</span>
           </div>
           <h1 className="text-5xl font-bold leading-tight mb-6">
-            Connecting Distributors <br /> with Modern UMKM.
+            Menghubungkan Distributor <br /> dengan UMKM Modern.
           </h1>
           <p className="text-xl text-primary-foreground/80 max-w-md">
-            The most reliable B2B marketplace to grow your supply chain business across Indonesia.
+            Marketplace B2B paling terpercaya untuk mengembangkan bisnis rantai pasok Anda di seluruh Indonesia.
           </p>
         </div>
         
         <div className="relative z-10 flex gap-12 text-sm opacity-80">
           <div>
-            <h3 className="font-bold mb-2">5,000+</h3>
-            <p>Active Distributors</p>
+            <h3 className="font-bold mb-2">5.000+</h3>
+            <p>Distributor Aktif</p>
           </div>
           <div>
-            <h3 className="font-bold mb-2">50,000+</h3>
-            <p>Verified UMKM</p>
+            <h3 className="font-bold mb-2">50.000+</h3>
+            <p>UMKM Terverifikasi</p>
           </div>
           <div>
-            <h3 className="font-bold mb-2">12M+</h3>
-            <p>Monthly Orders</p>
+            <h3 className="font-bold mb-2">12Jt+</h3>
+            <p>Pesanan Bulanan</p>
           </div>
         </div>
 
@@ -95,38 +77,41 @@ export default function Login() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
-            <Store size={24} className="text-primary" />
+          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
+            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center overflow-hidden border border-border p-1 shadow-sm">
+              <img src="/logo-PM.png" alt="Logo PasarMitra" className="w-full h-full object-contain" />
+            </div>
             <span className="text-xl font-bold">PasarMitra</span>
           </div>
           
           <div className="mb-10 text-center lg:text-left">
-            <h2 className="text-3xl font-bold mb-2">Welcome Back</h2>
-            <p className="text-muted-foreground">Please enter your details to sign in.</p>
+            <h2 className="text-3xl font-bold tracking-tight">Selamat Datang Kembali</h2>
+            <p className="text-muted-foreground mt-2">Silakan masuk ke akun PasarMitra Anda</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            <AuthInput 
-              label="Email Address"
-              type="email"
-              placeholder="name@company.com"
-              icon={Mail}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-semibold ml-1">Alamat Email</label>
+              <AuthInput 
+                label=""
+                type="email"
+                placeholder="nama@perusahaan.com"
+                icon={Mail}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Password
-                </label>
-                <Link to="/forgot-password" className="text-xs text-primary font-medium hover:underline">
-                  Forgot password?
+              <div className="flex justify-between items-center px-1">
+                <label className="text-sm font-semibold">Kata Sandi</label>
+                <Link to="/forgot-password" className="text-xs text-primary font-semibold hover:underline">
+                  Lupa kata sandi?
                 </Link>
               </div>
               <AuthInput 
-                label="" // Label handled above for forgot password link
+                label=""
                 type="password"
                 placeholder="••••••••"
                 icon={Lock}
@@ -142,35 +127,22 @@ export default function Login() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Signing in...
+                  Masuk...
                 </>
               ) : (
                 <>
                   <LogIn className="mr-2 h-5 w-5" />
-                  Sign In
+                  Masuk
                 </>
               )}
             </Button>
           </form>
 
-          <div className="mt-4">
-            <Button 
-              variant="outline" 
-              className="w-full h-12 rounded-xl border-dashed"
-              onClick={() => {
-                setEmail('distributor@demo.com');
-                setPassword('password');
-              }}
-            >
-              Use Demo Credentials
-            </Button>
-          </div>
-
           <div className="mt-10 pt-10 border-t text-center space-y-4">
             <p className="text-sm text-muted-foreground">
-              Don't have an account?{' '}
+              Belum punya akun?{' '}
               <Link to="/register" className="text-primary font-bold hover:underline">
-                Create Account
+                Buat Akun
               </Link>
             </p>
           </div>

@@ -29,7 +29,7 @@ export default function RegisterUniversal() {
     setError(null);
 
     const trimmedEmail = email.trim();
-    console.log('Attempting registration with email:', trimmedEmail, 'and role:', role);
+    console.log('Mencoba pendaftaran dengan email:', trimmedEmail, 'dan peran:', role);
     
     try {
       await authService.register(trimmedEmail, password, {
@@ -38,7 +38,7 @@ export default function RegisterUniversal() {
       });
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(err instanceof Error ? err.message : 'Pendaftaran gagal');
     } finally {
       setLoading(false);
     }
@@ -48,10 +48,10 @@ export default function RegisterUniversal() {
     return (
       <AuthCard>
         <AuthSuccess 
-          title="Check your email"
-          message={<>We've sent a verification link to <span className="font-semibold text-foreground">{email}</span>. Please verify your email to activate your account.</>}
+          title="Periksa email Anda"
+          message={<>Kami telah mengirimkan tautan verifikasi ke <span className="font-semibold text-foreground">{email}</span>. Silakan verifikasi email Anda untuk mengaktifkan akun.</>}
           onAction={() => navigate('/login')}
-          actionLabel="Back to Login"
+          actionLabel="Kembali ke Login"
         />
       </AuthCard>
     );
@@ -61,22 +61,24 @@ export default function RegisterUniversal() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex bg-slate-900 flex-col justify-between p-12 text-white relative overflow-hidden">
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-8">
-            <Store size={32} className="text-primary" />
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 p-1 shadow-md">
+              <img src="/logo-PM.png" alt="Logo PasarMitra" className="w-full h-full object-contain" />
+            </div>
             <span className="text-2xl font-bold">PasarMitra</span>
           </div>
           <h1 className="text-5xl font-black leading-tight mb-6 tracking-tighter">
-            Universal <br /> Access Portal.
+            Portal Akses <br /> Universal.
           </h1>
           <p className="text-xl text-slate-400 max-w-md">
-            Advanced account creation for system administrators, strategic distributors, and verified UMKM partners.
+            Pendaftaran akun lanjutan untuk administrator sistem, distributor strategis, dan mitra UMKM terverifikasi.
           </p>
         </div>
 
         <div className="relative z-10 p-8 bg-white/5 rounded-3xl backdrop-blur-md border border-white/10">
-          <p className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Security Notice</p>
+          <p className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Pemberitahuan Keamanan</p>
           <p className="text-slate-300">
-            Administrative accounts require secondary verification from the platform owner after registration.
+            Akun administratif memerlukan verifikasi sekunder dari pemilik platform setelah pendaftaran.
           </p>
         </div>
 
@@ -90,8 +92,8 @@ export default function RegisterUniversal() {
           className="w-full max-w-md"
         >
           <div className="mb-10">
-            <h2 className="text-3xl font-black tracking-tight mb-2">Create Account</h2>
-            <p className="text-muted-foreground font-medium">Choose your level of access within the ecosystem.</p>
+            <h2 className="text-3xl font-black tracking-tight mb-2">Buat Akun</h2>
+            <p className="text-muted-foreground font-medium">Pilih tingkat akses Anda di dalam ekosistem.</p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-6">
@@ -135,9 +137,9 @@ export default function RegisterUniversal() {
             </div>
 
             <AuthInput 
-              label="Entity Name / Full Name"
+              label="Nama Entitas / Nama Lengkap"
               type="text"
-              placeholder="e.g. PT. Global Logistik"
+              placeholder="mis. PT. Global Logistik"
               icon={User}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -145,9 +147,9 @@ export default function RegisterUniversal() {
             />
 
             <AuthInput 
-              label="Email Address"
+              label="Alamat Email"
               type="email"
-              placeholder="name@pasarmitra.com"
+              placeholder="nama@pasarmitra.com"
               icon={Mail}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -155,9 +157,9 @@ export default function RegisterUniversal() {
             />
 
             <AuthInput 
-              label="Secure Password"
+              label="Kata Sandi Aman"
               type="password"
-              placeholder="Min. 8 characters"
+              placeholder="Min. 8 karakter"
               icon={Lock}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -171,27 +173,27 @@ export default function RegisterUniversal() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing...
+                  Memproses...
                 </>
               ) : (
                 <>
                   <UserPlus className="mr-2 h-5 w-5" />
-                  Initialize Account
+                  Inisialisasi Akun
                 </>
               )}
             </Button>
           </form>
 
           <p className="mt-8 text-center text-sm text-muted-foreground font-medium">
-            Already registered?{' '}
+            Sudah terdaftar?{' '}
             <Link to="/login" className="text-primary font-black hover:underline tracking-tight">
-              Sign In
+              Masuk
             </Link>
           </p>
 
           <div className="mt-6 flex items-center gap-2 p-4 bg-muted/50 rounded-xl text-[10px] text-muted-foreground font-bold uppercase tracking-tight">
             <ShieldCheck size={14} className="text-primary shrink-0" />
-            <span>Encrypted Data Transmission • SECUREv4.1</span>
+            <span>Transmisi Data Terenkripsi • SECUREv4.1</span>
           </div>
         </motion.div>
       </div>

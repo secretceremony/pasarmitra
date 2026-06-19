@@ -1,37 +1,42 @@
-import { supabase } from '../../../lib/supabase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  sendPasswordResetEmail
+} from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../../../lib/firebase';
 
 export const authService = {
   async resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) throw error;
+    await sendPasswordResetEmail(auth, email);
     return true;
   },
 
   async login(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    return data;
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential;
   },
 
   async register(email: string, password: string, metadata?: any) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: metadata
-      }
-    });
-    if (error) throw error;
-    return data;
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    // Save metadata to user's profile document in Firestore
+    if (metadata) {
+      await setDoc(doc(db, 'profiles', user.uid), {
+        id: user.uid,
+        email: email,
+        created_at: new Date().toISOString(),
+        ...metadata
+      });
+    }
+    
+    return userCredential;
   },
 
   async logout() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await signOut(auth);
   }
 };
+

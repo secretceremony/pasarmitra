@@ -17,30 +17,30 @@ const CATEGORIES = [
 
 export function CategoryCarousel() {
   return (
-    <div className="space-y-8">
-      <h3 className="text-3xl font-black tracking-tighter text-foreground/90">Market Categories</h3>
+    <div className="space-y-6">
+      <h3 className="text-2xl md:text-3xl font-black tracking-tighter text-foreground/90">Market Categories</h3>
       <motion.div 
         variants={STAGGER_CONTAINER}
         initial="initial"
         animate="animate"
-        className="flex gap-6 overflow-x-auto pb-6 custom-scrollbar scroll-smooth"
+        className="flex gap-4 md:gap-6 overflow-x-auto pb-4 md:pb-6 custom-scrollbar scroll-smooth"
       >
          {CATEGORIES.map((cat) => (
            <motion.button
              key={cat.name}
              variants={FADE_UP}
-             className="flex flex-col items-center gap-4 min-w-[140px] shrink-0"
+             className="flex flex-col items-center gap-4 min-w-[110px] md:min-w-[140px] shrink-0"
            >
              <Surface 
                intent="card" 
-               padding="lg" 
+               padding="none" 
                hover="glow"
-               className="flex flex-col items-center gap-4 w-full group transition-all"
+               className="flex flex-col items-center gap-3 md:gap-4 w-full group transition-all p-4 md:p-6"
              >
-               <div className={cn("p-5 rounded-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-2xl", cat.color)}>
-                  <cat.icon size={32} />
-               </div>
-               <span className="text-base font-black tracking-tight">{cat.name}</span>
+                <div className={cn("p-4 md:p-5 rounded-xl md:rounded-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-2xl", cat.color)}>
+                   <cat.icon className="w-6 h-6 md:w-8 md:h-8" />
+                </div>
+                <span className="text-xs md:text-base font-black tracking-tight">{cat.name}</span>
              </Surface>
            </motion.button>
          ))}

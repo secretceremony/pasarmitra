@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  orderBy, 
+  onSnapshot, 
+  doc, 
+  setDoc 
+} from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 import { useAuthStore } from '../../../store/use-auth-store';
 
 interface Message {
@@ -15,25 +25,61 @@ interface Message {
 export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTyping, setIsTyping] = useState<Record<string, boolean>>({});
   const { user } = useAuthStore();
 
-  const fetchMessages = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('room_id', roomId)
-        .order('created_at', { ascending: true });
+  // Subscribe to messages in real-time
+  useEffect(() => {
+    if (!roomId) return;
+    
+    setIsLoading(true);
+    const q = query(
+      collection(db, 'messages'),
+      where('room_id', '==', roomId),
+      orderBy('created_at', 'asc')
+    );
 
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    } finally {
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const msgs: Message[] = [];
+      querySnapshot.forEach((doc) => {
+        msgs.push({ id: doc.id, ...doc.data() } as Message);
+      });
+      setMessages(msgs);
       setIsLoading(false);
-    }
+    }, (error) => {
+      console.error('Error fetching messages snapshot:', error);
+      setIsLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [roomId]);
+
+  // Subscribe to typing indicators in real-time
+  useEffect(() => {
+    if (!roomId) return;
+
+    const typingQuery = collection(db, 'rooms', roomId, 'typing');
+    const unsubscribeTyping = onSnapshot(typingQuery, (snapshot) => {
+      const typingMap: Record<string, boolean> = {};
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.user_id !== user?.id) {
+          // Check if updated in the last 10 seconds to avoid stale states
+          const timeDiff = Date.now() - new Date(data.updated_at).getTime();
+          if (data.is_typing && timeDiff < 10000) {
+            typingMap[doc.id] = true;
+          }
+        }
+      });
+      setIsTyping(typingMap);
+    });
+
+    return () => {
+      unsubscribeTyping();
+    };
+  }, [roomId, user]);
 
   const sendMessage = async (text: string, type: 'text' | 'offer' = 'text', metadata?: any) => {
     if (!user) return;
@@ -52,17 +98,14 @@ export const useChat = (roomId: string) => {
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      const { error } = await supabase
-        .from('messages')
-        .insert([{ 
-          room_id: roomId, 
-          sender_id: user.id, 
-          text, 
-          type,
-          metadata
-        }]);
-
-      if (error) throw error;
+      await addDoc(collection(db, 'messages'), { 
+        room_id: roomId, 
+        sender_id: user.id, 
+        text, 
+        type,
+        metadata: metadata || null,
+        created_at: new Date().toISOString()
+      });
     } catch (err) {
       console.error('Error sending message:', err);
       // Rollback optimistic update
@@ -70,47 +113,20 @@ export const useChat = (roomId: string) => {
     }
   };
 
-  const [isTyping, setIsTyping] = useState<Record<string, boolean>>({});
-
   const setTyping = useCallback(async (typing: boolean) => {
-    if (!user) return;
-    const channel = supabase.channel(`room:${roomId}`);
-    await channel.send({
-      type: 'broadcast',
-      event: 'typing',
-      payload: { user_id: user.id, is_typing: typing },
-    });
+    if (!user || !roomId) return;
+    try {
+      const typingDocRef = doc(db, 'rooms', roomId, 'typing', user.id);
+      await setDoc(typingDocRef, {
+        user_id: user.id,
+        is_typing: typing,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Error setting typing state:', err);
+    }
   }, [roomId, user]);
-
-  useEffect(() => {
-    fetchMessages();
-
-    const channel = supabase
-      .channel(`room:${roomId}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'messages',
-        filter: `room_id=eq.${roomId}`
-      }, (payload) => {
-        const newMessage = payload.new as Message;
-        setMessages((prev) => {
-          if (prev.find(m => m.id === newMessage.id)) return prev;
-          return [...prev, newMessage];
-        });
-      })
-      .on('broadcast', { event: 'typing' }, (payload) => {
-        setIsTyping((prev) => ({
-          ...prev,
-          [payload.payload.user_id]: payload.payload.is_typing,
-        }));
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [roomId, fetchMessages]);
 
   return { messages, isLoading, sendMessage, isTyping, setTyping };
 };
+

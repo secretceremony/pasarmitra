@@ -31,11 +31,11 @@ export function MarketplaceSection({
 
   return (
     <section className={cn("space-y-10", className)}>
-      <div className={cn("flex items-end justify-between px-2", headerClassName)}>
-        <div className={cn("space-y-2 border-l-4 pl-8 py-2", accentBorder)}>
-          <h3 className="text-4xl font-black tracking-tighter">{title}</h3>
+      <div className={cn("flex flex-col sm:flex-row sm:items-end justify-between gap-4 px-2", headerClassName)}>
+        <div className={cn("space-y-2 border-l-4 pl-4 md:pl-8 py-2", accentBorder)}>
+          <h3 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter">{title}</h3>
           {subtitle && (
-            <p className="text-muted-foreground text-lg font-medium">{subtitle}</p>
+            <p className="text-muted-foreground text-sm sm:text-base md:text-lg font-medium">{subtitle}</p>
           )}
         </div>
         
@@ -43,9 +43,9 @@ export function MarketplaceSection({
           <Button 
             variant="link" 
             onClick={onAction}
-            className={cn("font-black flex gap-3 items-center text-xl p-0 hover:gap-4 transition-all", actionText)}
+            className={cn("font-black flex gap-2 sm:gap-3 items-center text-sm sm:text-base md:text-xl p-0 hover:gap-4 transition-all w-fit", actionText)}
           >
-            {actionLabel} <ArrowRight size={24} />
+            {actionLabel} <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
           </Button>
         )}
       </div>

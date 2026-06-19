@@ -23,27 +23,27 @@ export default function ForgotPassword() {
 
   return (
     <AuthCard>
-      <AuthBackButton to="/login" label="Back to Sign In" />
+      <AuthBackButton to="/login" label="Kembali ke Halaman Masuk" />
 
       <AuthHeader 
-        title="Forgot Password?" 
-        description="No worries, we'll send you reset instructions." 
+        title="Lupa Kata Sandi?" 
+        description="Jangan khawatir, kami akan mengirimkan instruksi untuk mengatur ulang kata sandi Anda." 
         icon={KeyRound} 
       />
 
       {success ? (
         <AuthSuccess 
-          title="Check your inbox"
-          message={<>We've sent a password reset link to <span className="font-bold">{email}</span>.</>}
+          title="Periksa kotak masuk Anda"
+          message={<>Kami telah mengirimkan tautan atur ulang kata sandi ke <span className="font-bold">{email}</span>.</>}
           onAction={resetSuccess}
-          actionLabel="Back to Forgot Password"
+          actionLabel="Kembali ke Lupa Kata Sandi"
         />
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
           <AuthInput 
-            label="Email Address"
+            label="Alamat Email"
             type="email"
-            placeholder="name@company.com"
+            placeholder="nama@perusahaan.com"
             icon={Mail}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -54,9 +54,9 @@ export default function ForgotPassword() {
 
           <Button disabled={loading} type="submit" className="w-full h-12 text-lg rounded-xl">
             {loading ? (
-              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Sending Link...</>
+              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Mengirim Tautan...</>
             ) : (
-              'Reset Password'
+              'Atur Ulang Kata Sandi'
             )}
           </Button>
         </form>

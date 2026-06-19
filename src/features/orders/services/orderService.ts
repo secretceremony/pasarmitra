@@ -1,4 +1,14 @@
-import { supabase } from '../../../lib/supabase';
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  orderBy, 
+  updateDoc, 
+  doc, 
+  getDoc 
+} from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 
 export interface OrderItem {
   id: string;
@@ -27,31 +37,68 @@ export interface Order {
 
 export const orderService = {
   getDistributorOrders: async (distributorId: string) => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        buyer_profile:buyer_id (
-          organization_name,
-          email
-        )
-      `)
-      .eq('distributor_id', distributorId)
-      .order('created_at', { ascending: false });
+    const q = query(
+      collection(db, 'orders'),
+      where('distributor_id', '==', distributorId),
+      orderBy('created_at', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    const orders: Order[] = [];
     
-    if (error) throw error;
-    return data as Order[];
+    for (const document of querySnapshot.docs) {
+      const orderData = document.data() as Omit<Order, 'id'>;
+      const orderId = document.id;
+      
+      // Resolve buyer_profile relation
+      let buyer_profile: Order['buyer_profile'] = undefined;
+      if (orderData.buyer_id) {
+        const profileSnap = await getDoc(doc(db, 'profiles', orderData.buyer_id));
+        if (profileSnap.exists()) {
+          const profileData = profileSnap.data();
+          buyer_profile = {
+            organization_name: profileData.organization_name || '',
+            email: profileData.email || '',
+          };
+        }
+      }
+      
+      orders.push({
+        id: orderId,
+        ...orderData,
+        buyer_profile,
+      } as Order);
+    }
+    
+    return orders;
   },
 
   updateOrderStatus: async (id: string, status: Order['status']) => {
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ status })
-      .eq('id', id)
-      .select()
-      .single();
+    const docRef = doc(db, 'orders', id);
+    await updateDoc(docRef, { status });
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      throw new Error('Order not found');
+    }
+    const orderData = snap.data() as Omit<Order, 'id'>;
     
-    if (error) throw error;
-    return data as Order;
+    // Resolve buyer_profile relation
+    let buyer_profile: Order['buyer_profile'] = undefined;
+    if (orderData.buyer_id) {
+      const profileSnap = await getDoc(doc(db, 'profiles', orderData.buyer_id));
+      if (profileSnap.exists()) {
+        const profileData = profileSnap.data();
+        buyer_profile = {
+          organization_name: profileData.organization_name || '',
+          email: profileData.email || '',
+        };
+      }
+    }
+    
+    return {
+      id: snap.id,
+      ...orderData,
+      buyer_profile,
+    } as Order;
   }
 };
+

@@ -35,7 +35,7 @@ export default function Register() {
       });
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(err instanceof Error ? err.message : 'Pendaftaran gagal');
     } finally {
       setLoading(false);
     }
@@ -45,10 +45,10 @@ export default function Register() {
     return (
       <AuthCard>
         <AuthSuccess 
-          title="Check your email"
-          message={<>We've sent a verification link to <span className="font-semibold text-foreground">{email}</span>. Please verify your email to activate your account.</>}
+          title="Periksa email Anda"
+          message={<>Kami telah mengirimkan tautan verifikasi ke <span className="font-semibold text-foreground">{email}</span>. Silakan verifikasi email Anda untuk mengaktifkan akun.</>}
           onAction={() => navigate('/login')}
-          actionLabel="Back to Login"
+          actionLabel="Kembali ke Login"
         />
       </AuthCard>
     );
@@ -58,27 +58,29 @@ export default function Register() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex bg-primary flex-col justify-between p-12 text-primary-foreground relative overflow-hidden">
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-8">
-            <Store size={32} />
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 p-1 shadow-md">
+              <img src="/logo-PM.png" alt="Logo PasarMitra" className="w-full h-full object-contain" />
+            </div>
             <span className="text-2xl font-bold">PasarMitra</span>
           </div>
           <h1 className="text-5xl font-bold leading-tight mb-6">
-            Join the Largest <br /> B2B Network.
+            Bergabung dengan <br /> Jaringan B2B Terbesar.
           </h1>
           <p className="text-xl text-primary-foreground/80 max-w-md">
-            Empowering local businesses through a verified supply chain and direct partnerships.
+            Memberdayakan bisnis lokal melalui rantai pasok terverifikasi dan kemitraan langsung.
           </p>
         </div>
 
         <div className="relative z-10 p-8 bg-white/10 rounded-3xl backdrop-blur-sm border border-white/10">
           <p className="italic text-lg mb-4">
-            "PasarMitra transformed how we manage inventory. The direct connection to distributors saved us 15% in procurement costs."
+            "PasarMitra mengubah cara kami mengelola inventaris. Sambungan langsung ke distributor menghemat 15% biaya pengadaan kami."
           </p>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20" />
             <div>
               <p className="font-bold">Budi Santoso</p>
-              <p className="text-sm opacity-60">Owner, Toko Kelontong Sejahtera</p>
+              <p className="text-sm opacity-60">Pemilik, Toko Kelontong Sejahtera</p>
             </div>
           </div>
         </div>
@@ -93,8 +95,8 @@ export default function Register() {
           className="w-full max-w-md"
         >
           <div className="mb-10">
-            <h2 className="text-3xl font-bold mb-2">Create Account</h2>
-            <p className="text-muted-foreground">Select your business role to get started.</p>
+            <h2 className="text-3xl font-bold mb-2">Buat Akun</h2>
+            <p className="text-muted-foreground">Pilih peran bisnis Anda untuk memulai.</p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-6">
@@ -126,9 +128,9 @@ export default function Register() {
             </div>
 
             <AuthInput 
-              label="Full Name / Entity Name"
+              label="Nama Lengkap / Nama Entitas"
               type="text"
-              placeholder="John Doe or PT. Mitra Jaya"
+              placeholder="mis. Budi Santoso atau PT. Mitra Jaya"
               icon={User}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -136,9 +138,9 @@ export default function Register() {
             />
 
             <AuthInput 
-              label="Email Address"
+              label="Alamat Email"
               type="email"
-              placeholder="name@company.com"
+              placeholder="nama@perusahaan.com"
               icon={Mail}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -146,9 +148,9 @@ export default function Register() {
             />
 
             <AuthInput 
-              label="Password"
+              label="Kata Sandi"
               type="password"
-              placeholder="Min. 8 characters"
+              placeholder="Min. 8 karakter"
               icon={Lock}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -162,27 +164,27 @@ export default function Register() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating Account...
+                  Membuat Akun...
                 </>
               ) : (
                 <>
                   <UserPlus className="mr-2 h-5 w-5" />
-                  Join PasarMitra
+                  Daftar PasarMitra
                 </>
               )}
             </Button>
           </form>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
+            Sudah punya akun?{' '}
             <Link to="/login" className="text-primary font-bold hover:underline">
-              Sign In
+              Masuk
             </Link>
           </p>
 
           <div className="mt-6 flex items-center gap-2 p-4 bg-muted/50 rounded-xl text-xs text-muted-foreground">
             <ShieldCheck size={16} className="text-primary shrink-0" />
-            <span>By joining, you agree to our Terms of Service and Privacy Policy.</span>
+            <span>Dengan bergabung, Anda menyetujui Ketentuan Layanan dan Kebijakan Privasi kami.</span>
           </div>
         </motion.div>
       </div>

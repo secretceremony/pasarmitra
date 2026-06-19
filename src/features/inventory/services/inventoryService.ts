@@ -1,4 +1,16 @@
-import { supabase } from '../../../lib/supabase';
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  orderBy, 
+  addDoc, 
+  updateDoc, 
+  doc, 
+  getDoc, 
+  deleteDoc 
+} from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 
 export interface TieredPrice {
   min_quantity: number;
@@ -23,45 +35,40 @@ export interface Product {
 
 export const inventoryService = {
   getDistributorProducts: async (distributorId: string) => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('distributor_id', distributorId)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data as Product[];
+    const q = query(
+      collection(db, 'products'),
+      where('distributor_id', '==', distributorId),
+      orderBy('created_at', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    const products: Product[] = [];
+    querySnapshot.forEach((doc) => {
+      products.push({ id: doc.id, ...doc.data() } as Product);
+    });
+    return products;
   },
 
   createProduct: async (product: Omit<Product, 'id' | 'created_at'>) => {
-    const { data, error } = await supabase
-      .from('products')
-      .insert([product])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as Product;
+    const newProduct = {
+      ...product,
+      created_at: new Date().toISOString(),
+    };
+    const docRef = await addDoc(collection(db, 'products'), newProduct);
+    return { id: docRef.id, ...newProduct } as Product;
   },
 
   updateProduct: async (id: string, updates: Partial<Product>) => {
-    const { data, error } = await supabase
-      .from('products')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as Product;
+    const docRef = doc(db, 'products', id);
+    await updateDoc(docRef, updates);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      throw new Error('Product not found');
+    }
+    return { id: snap.id, ...snap.data() } as Product;
   },
 
   deleteProduct: async (id: string) => {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
+    await deleteDoc(doc(db, 'products', id));
   }
 };
+

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Product } from '../types/product.types';
+import { MarketplaceProduct } from '../types/product.types';
 import { PRODUCTS } from '../data/products';
 
 export function useMarketplaceFilters() {

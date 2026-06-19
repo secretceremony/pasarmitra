@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ShoppingBasket } from "lucide-react";
 import { Button } from "../../../components/ui/button";
+import { MARKETPLACE_UI_STRINGS } from "../config/marketplace-ui.config";
 
 interface MarketplaceEmptyStateProps {
   onReset: () => void;
@@ -13,15 +14,15 @@ export function MarketplaceEmptyState({ onReset }: MarketplaceEmptyStateProps) {
           <ShoppingBasket size={40} />
        </div>
        <div className="space-y-2">
-          <h3 className="text-2xl font-black">No products found</h3>
-          <p className="text-muted-foreground font-medium">Try adjusting your filters or search keywords.</p>
+          <h3 className="text-2xl font-black">{MARKETPLACE_UI_STRINGS.noProducts}</h3>
+          <p className="text-muted-foreground font-medium">{MARKETPLACE_UI_STRINGS.noProductsDesc}</p>
        </div>
        <Button 
         variant="outline" 
         onClick={onReset} 
         className="h-12 rounded-2xl border-primary text-primary font-black uppercase px-8"
       >
-        Reset All Filters
+        {MARKETPLACE_UI_STRINGS.resetFilters}
       </Button>
     </div>
   );

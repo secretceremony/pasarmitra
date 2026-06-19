@@ -61,15 +61,17 @@ export default function App() {
                   <Route path="/checkout" element={<CheckoutWizard />} />
                   <Route path="/my-partners" element={<MyPartners />} />
                   
-                  {/* Admin Routes */}
-                  <Route path="/admin" element={<AdminDashboard />} />
-                  <Route path="/admin/users" element={<UserManagement />} />
-                  <Route path="/admin/verifications" element={<DistributorVerification />} />
-                  <Route path="/admin/finances" element={<FinancialDashboard />} />
-                  <Route path="/admin/commissions" element={<CommissionManagement />} />
-                  <Route path="/admin/moderation" element={<ModerationSystem />} />
-                  <Route path="/admin/disputes" element={<DisputeManagement />} />
-                  <Route path="/admin/audit" element={<AuditLogSystem />} />
+                  {/* Admin Only Routes */}
+                  <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]} />}>
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/users" element={<UserManagement />} />
+                    <Route path="/admin/verifications" element={<DistributorVerification />} />
+                    <Route path="/admin/finances" element={<FinancialDashboard />} />
+                    <Route path="/admin/commissions" element={<CommissionManagement />} />
+                    <Route path="/admin/moderation" element={<ModerationSystem />} />
+                    <Route path="/admin/disputes" element={<DisputeManagement />} />
+                    <Route path="/admin/audit" element={<AuditLogSystem />} />
+                  </Route>
                   
                   {/* General Protected Routes */}
                   <Route path="/negotiations" element={<ChatNegotiation />} />

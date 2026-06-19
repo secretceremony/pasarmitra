@@ -1,43 +1,98 @@
 import { useQuery } from '@tanstack/react-query';
+import { collection, getDocs, getDoc, doc, query, where } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 import { dashboardAdapters } from '../../../core/adapters/dashboard';
 import { dashboardSelectors } from '../selectors';
 
 /**
- * Mock data representing what might come from an API.
- * In a real scenario, this would be fetched via axios/fetch/supabase.
- */
-const MOCK_RAW_DEALS = [
-  { id: 1, name: 'Minyak Goreng SunCo 2L', price: 'Rp 32.500', stock: 1240, minOrder: '1 Box', distributor: 'PT. Salim Ivomas', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=400', discount: '-15%' },
-  { id: 2, name: 'Beras Pandan Wangi 25kg', price: 'Rp 345.000', stock: 85, minOrder: '5 Sacks', distributor: 'Mitra Tani Sejahtera', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=400', discount: 'HOT' },
-  { id: 3, name: 'Kopi Kapal Api Mix 1 Dus', price: 'Rp 142.000', stock: 560, minOrder: '10 Dus', distributor: 'Santos Jaya Abadi', image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&q=80&w=400', discount: '-5%' },
-  { id: 4, name: 'Gula Pasir Gulaku 1kg', price: 'Rp 16.200', stock: 2100, minOrder: '1 Karton', distributor: 'Sugar Group Companies', image: 'https://images.unsplash.com/photo-1581441363689-1f3c3c414635?auto=format&fit=crop&q=80&w=400', discount: '-10%' },
-];
-
-const MOCK_RAW_SUPPLIERS = [
-  { id: 1, name: 'PT. Indofood Sukses Makmur', location: 'Jakarta Utara', rating: 4.9, products: '2,400+', verified: true },
-  { id: 2, name: 'Wings Group Indonesia', location: 'Surabaya', rating: 4.8, products: '1,800+', verified: true },
-  { id: 3, name: 'Mayora Indah Tbk', location: 'Tangerang', rating: 4.7, products: '900+', verified: true },
-];
-
-/**
- * Hook to fetch and prepare dashboard data.
+ * Hook to fetch and prepare dashboard data from Firestore.
  * Leverages adapters for normalization and selectors for specific views.
  */
 export function useDashboardData() {
   const dealsQuery = useQuery({
     queryKey: ['dashboard', 'deals'],
     queryFn: async () => {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return MOCK_RAW_DEALS.map(dashboardAdapters.toProductSummary);
+      // Fetch active products from Firestore
+      const q = query(
+        collection(db, 'products'),
+        where('is_active', '==', true)
+      );
+      const querySnapshot = await getDocs(q);
+      const rawDeals = [];
+      
+      for (const docSnap of querySnapshot.docs) {
+        const data = docSnap.data();
+        const pId = docSnap.id;
+        
+        // Resolve distributor name
+        let distributorName = 'Distributor';
+        if (data.distributor_id) {
+          try {
+            const distSnap = await getDoc(doc(db, 'profiles', data.distributor_id));
+            if (distSnap.exists()) {
+              const distData = distSnap.data();
+              distributorName = distData.organization_name || distData.business_name || distData.full_name || 'Distributor';
+            }
+          } catch (e) {
+            console.error('Error fetching distributor profile:', e);
+          }
+        }
+        
+        rawDeals.push({
+          id: pId,
+          name: data.name || 'Produk Tanpa Nama',
+          price: data.price || 0,
+          stock: data.stock || 0,
+          minOrder: `${data.min_order_quantity || 1} ${data.unit_type || 'Unit'}`,
+          distributor: distributorName,
+          image: data.image_url || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=400',
+          discount: data.discount_tag || '',
+        });
+      }
+      
+      return rawDeals.map(dashboardAdapters.toProductSummary);
     }
   });
 
   const suppliersQuery = useQuery({
     queryKey: ['dashboard', 'suppliers'],
     queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return MOCK_RAW_SUPPLIERS.map(dashboardAdapters.toSupplierSummary);
+      // Query profiles where role is DISTRIBUTOR
+      const q = query(
+        collection(db, 'profiles'),
+        where('role', '==', 'DISTRIBUTOR')
+      );
+      const querySnapshot = await getDocs(q);
+      const rawSuppliers = [];
+      
+      for (const docSnap of querySnapshot.docs) {
+        const data = docSnap.data();
+        const sId = docSnap.id;
+        
+        // Count products for this distributor
+        let productCount = '0+';
+        try {
+          const prodQ = query(
+            collection(db, 'products'),
+            where('distributor_id', '==', sId)
+          );
+          const prodSnap = await getDocs(prodQ);
+          productCount = `${prodSnap.size}+`;
+        } catch (e) {
+          console.error('Error counting products:', e);
+        }
+        
+        rawSuppliers.push({
+          id: sId,
+          name: data.organization_name || data.business_name || data.full_name || 'Distributor',
+          location: data.address || 'Indonesia',
+          rating: data.reputation_score || 5.0,
+          verified: data.is_verified || false,
+          products: productCount,
+        });
+      }
+      
+      return rawSuppliers.map(dashboardAdapters.toSupplierSummary);
     }
   });
 
