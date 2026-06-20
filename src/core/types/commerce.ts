@@ -31,6 +31,9 @@ export interface ProductSummary {
   supplier: Partial<SupplierSummary>;
   image: string;
   discountTag?: string;
+  description?: string;
+  category?: string;
+  tiered_pricing?: any[];
 }
 
 export interface AnalyticsTrend {

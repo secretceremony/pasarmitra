@@ -30,6 +30,7 @@ import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog, updateDisputeStatus } from '../services/adminService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
+import { formatDateTime } from '../../../lib/dateUtils';
 
 const DEFAULT_DISPUTES = [
   {
@@ -247,20 +248,8 @@ export const DisputeManagement = () => {
     return 'danger';
   };
 
-  const formatDisputeDate = (dispute: any) => {
-    if (dispute.created) return dispute.created;
-    if (dispute.created_at) {
-      try {
-        const d = typeof dispute.created_at.toDate === 'function' 
-          ? dispute.created_at.toDate() 
-          : new Date(dispute.created_at);
-        return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-      } catch {
-        return 'Baru saja';
-      }
-    }
-    return 'Baru saja';
-  };
+  // Replaced by shared formatDateTime from dateUtils — handles Firestore Timestamp, ISO string, and nulls
+  const formatDisputeDate = (dispute: any) => formatDateTime(dispute.created_at || dispute.created);
 
   return (
     <div className="space-y-12">
@@ -500,7 +489,7 @@ export const DisputeManagement = () => {
                              {selected.admin_note && (
                                <p>Catatan Admin: {selected.admin_note}</p>
                              )}
-                             <p className="text-xs text-muted-foreground font-normal">Ditinjau oleh: {selected.reviewed_by || 'Admin'} pada {selected.reviewed_at ? (typeof selected.reviewed_at.toDate === 'function' ? selected.reviewed_at.toDate().toLocaleString() : new Date(selected.reviewed_at).toLocaleString()) : '-'}</p>
+                             <p className="text-xs text-muted-foreground font-normal">Ditinjau oleh: {selected.reviewed_by || 'Admin'} pada {formatDateTime(selected.reviewed_at)}</p>
                           </div>
                        </div>
                     ) : (

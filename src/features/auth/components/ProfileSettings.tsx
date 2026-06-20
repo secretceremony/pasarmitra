@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { profileService } from '../services/profileService';
-import { authService } from '../services/auth.service';
+
 import { UserRole, UserProfile } from '../types/auth.types';
 import { toast } from 'sonner';
 import { 
@@ -13,7 +13,6 @@ import {
   MapPin, 
   Building2, 
   FileText, 
-  LogOut, 
   ArrowLeft, 
   ShieldCheck, 
   AlertTriangle,
@@ -22,11 +21,11 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
-import { motion } from 'motion/react';
+
 
 export const ProfileSettings = () => {
-  const { user, setUser, logout: clearStore } = useAuthStore();
-  const navigate = useNavigate();
+  const { user, setUser } = useAuthStore();
+
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -132,18 +131,8 @@ export const ProfileSettings = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await authService.logout();
-      clearStore();
-      navigate('/login');
-      toast.success('Berhasil keluar dari akun.');
-    } catch (err: any) {
-      console.error('Gagal keluar:', err);
-      clearStore();
-      navigate('/login');
-    }
-  };
+  // const handleLogout removed – logout is now only via sidebar
+
 
   // Helper labels for Indonesia role display
   const getRoleLabel = (role: string) => {
@@ -492,16 +481,7 @@ export const ProfileSettings = () => {
             </div>
           </div>
 
-          {/* Logout Action */}
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleLogout}
-            className="w-full h-14 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 font-black text-sm uppercase hover:bg-rose-500 hover:text-white transition-all shadow-md flex items-center justify-center gap-3"
-          >
-            <LogOut size={20} />
-            Keluar dari Akun
-          </Button>
+          {/* Logout button removed – handled by sidebar */}
         </div>
       </form>
     </div>

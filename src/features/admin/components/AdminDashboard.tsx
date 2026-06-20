@@ -20,6 +20,7 @@ import {
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
+import { formatDate } from '../../../lib/dateUtils';
 import { 
   AreaChart, 
   Area, 
@@ -144,9 +145,9 @@ export const AdminDashboard = () => {
   const completedOrders = orders.filter(o => o.status === 'delivered');
   const totalVolume = completedOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
   const commissionRevenue = completedOrders.reduce((sum, o) => {
-    const fee = o.platform_fee ?? o.service_fee;
-    if (fee !== undefined && fee !== null) {
-      return sum + Number(fee);
+    const fee = Number(o.platform_fee ?? o.service_fee);
+    if (Number.isFinite(fee) && fee > 0) {
+      return sum + fee;
     }
     return sum + (Number(o.total_amount) || 0) * (globalBaseline / 100);
   }, 0);
@@ -288,7 +289,7 @@ export const AdminDashboard = () => {
       if (diffMin < 1) return 'Baru saja';
       if (diffMin < 60) return `${diffMin} menit lalu`;
       if (diffHr < 24) return `${diffHr} jam lalu`;
-      return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+      return formatDate(date);
     } catch {
       return timestampStr || 'Baru saja';
     }

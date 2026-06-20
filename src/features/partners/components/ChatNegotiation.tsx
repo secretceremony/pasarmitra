@@ -22,6 +22,7 @@ import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'fire
 import { db } from '../../../lib/firebase';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { formatTime } from '../../../lib/dateUtils';
 
 export const ChatNegotiation = () => {
   const { user } = useAuthStore();
@@ -349,7 +350,7 @@ export const ChatNegotiation = () => {
                     <div className="flex justify-between items-center text-[10px] font-medium border-t border-border/30 pt-3">
                       <span className="truncate max-w-[150px] opacity-75">{neg.latest_message}</span>
                       <span className="shrink-0 text-muted-foreground">
-                        {new Date(neg.latest_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatTime(neg.latest_message_at)}
                       </span>
                     </div>
                   </motion.button>
@@ -484,7 +485,7 @@ export const ChatNegotiation = () => {
                           {msg.message}
                         </div>
                         <span className="text-[9px] font-bold text-muted-foreground block px-2">
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatTime(msg.created_at)}
                         </span>
                       </div>
                     </div>

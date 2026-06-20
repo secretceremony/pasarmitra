@@ -106,13 +106,8 @@ export const inventoryService = {
       distributor_id: product.distributor_id,
       status: 'pending',
       reason: 'Persetujuan Produk Baru',
-      timestamp: new Date().toLocaleString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
+      // Store as ISO string; display formatting happens in the UI layer via formatDateTime
+      timestamp: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       image: product.image_url || null,

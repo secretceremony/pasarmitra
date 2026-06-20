@@ -42,6 +42,11 @@ export const CheckoutWizard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrderCodes, setCreatedOrderCodes] = useState<string[]>([]);
   
+  // Selection state variables to preserve choices when navigating steps
+  const [selectedAddress, setSelectedAddress] = useState(0);
+  const [selectedShipping, setSelectedShipping] = useState(0);
+  const [selectedPayment, setSelectedPayment] = useState(0);
+  
   const [searchParams] = useSearchParams();
   const negotiationId = searchParams.get('negotiationId');
   const [negotiation, setNegotiation] = useState<any | null>(null);
@@ -154,6 +159,10 @@ export const CheckoutWizard = () => {
     return cartTotalPrice();
   };
 
+  const getShippingCost = () => {
+    return selectedShipping === 1 ? 25000 : 0;
+  };
+
   const handlePlaceOrder = async () => {
     if (!user) {
       toast.error("Anda harus login untuk melakukan checkout.");
@@ -167,6 +176,16 @@ export const CheckoutWizard = () => {
 
     setIsSubmitting(true);
 
+    const activeAddress = selectedAddress === 0 
+      ? 'Jl. Menteng Raya No. 42, Jakarta Pusat, DKI Jakarta 10310' 
+      : 'Alamat Kustom/Tambahan';
+      
+    const activePaymentMethod = selectedPayment === 0 
+      ? 'Credit Term (30 Days)' 
+      : selectedPayment === 1 
+        ? 'Bank Transfer (BCA/Mandiri)' 
+        : 'Balance / Wallet';
+
     if (negotiationId) {
       if (!negotiation) {
         toast.error("Data negosiasi belum siap.");
@@ -179,8 +198,8 @@ export const CheckoutWizard = () => {
           user.id,
           user.full_name || user.email || '',
           user.email || '',
-          'Jl. Menteng Raya No. 42, Jakarta Pusat, DKI Jakarta 10310',
-          'Credit Term (30 Days)'
+          activeAddress,
+          activePaymentMethod
         );
         setCreatedOrderCodes([result.order_code]);
         toast.success("Pesanan dari negosiasi berhasil dibuat.");
@@ -233,14 +252,12 @@ export const CheckoutWizard = () => {
           distributor_name: distributorName,
           items: orderItems,
           subtotal: orderSubtotal,
-          total_amount: orderSubtotal,
-          shipping_address: 'Jl. Menteng Raya No. 42, Jakarta Pusat, DKI Jakarta 10310', // Default address from Step 0
+          total_amount: orderSubtotal + getShippingCost(),
+          shipping_address: activeAddress,
           payment_status: 'unpaid' as const,
           status: 'pending' as const,
-          payment_method: 'Credit Term (30 Days)', // Default payment from Step 1
-          shipping_cost: 0,
-          service_fee: 0,
-          platform_fee: 0
+          payment_method: activePaymentMethod,
+          shipping_cost: getShippingCost()
         };
 
         return {
@@ -290,6 +307,15 @@ export const CheckoutWizard = () => {
     }
   };
 
+  const handleBack = () => {
+    if (step > 0 && step < 3) {
+      setStep(step - 1);
+    } else {
+      // Safe fallback to marketplace listing to prevent routing to unexpected/unauthorized role pages
+      navigate('/marketplace');
+    }
+  };
+
   if (isLoadingNeg) {
     return (
       <div className="min-h-[400px] flex flex-col items-center justify-center gap-4 text-muted-foreground">
@@ -310,10 +336,10 @@ export const CheckoutWizard = () => {
           <p className="text-muted-foreground font-medium">{negError}</p>
         </div>
         <div className="flex gap-4 justify-center">
-          <Button onClick={() => navigate('/negotiations')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black">
+          <Button onClick={() => navigate('/negotiations')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black cursor-pointer">
             Kembali ke Negosiasi
           </Button>
-          <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-8 rounded-2xl border-border">
+          <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-8 rounded-2xl border-border cursor-pointer">
             Kembali ke Beranda
           </Button>
         </div>
@@ -339,10 +365,10 @@ export const CheckoutWizard = () => {
           )}
         </div>
         <div className="flex gap-4 justify-center">
-          <Button onClick={() => navigate('/orders')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black">
+          <Button onClick={() => navigate('/orders')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black cursor-pointer">
             Lihat Daftar Pesanan
           </Button>
-          <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-8 rounded-2xl border-border">
+          <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-8 rounded-2xl border-border cursor-pointer">
             Kembali ke Beranda
           </Button>
         </div>
@@ -351,14 +377,26 @@ export const CheckoutWizard = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-12 pb-20">
+    <div className="max-w-5xl mx-auto space-y-8 pb-20 px-4 md:px-0">
+      {/* Explicit Back button in UI */}
+      {step < 3 && (
+        <Button
+          variant="ghost"
+          onClick={handleBack}
+          className="h-10 px-4 rounded-xl text-xs font-bold border border-border/40 hover:bg-muted cursor-pointer flex items-center w-fit gap-2 transition-all"
+        >
+          <ArrowLeft size={16} />
+          {step === 0 ? 'Kembali' : 'Kembali ke Langkah Sebelumnya'}
+        </Button>
+      )}
+
       {/* Checkout Header */}
-      <div className="flex items-center justify-between py-10 border-b border-border/50">
+      <div className="flex flex-col md:flex-row md:items-center justify-between py-6 border-b border-border/50 gap-4">
          <div className="space-y-1">
             <h1 className="text-4xl font-black tracking-tighter">Procurement Checkout</h1>
             <p className="text-muted-foreground font-medium">Finalize your wholesale order and schedule delivery.</p>
          </div>
-         <div className="flex gap-4">
+         <div className="flex gap-4 flex-wrap">
             {STEPS.map((s, i) => (
               <div key={s} className="flex items-center gap-4">
                  <div className={cn(
@@ -391,12 +429,20 @@ export const CheckoutWizard = () => {
                 >
                    <h2 className="text-2xl font-black tracking-tight">Shipping Destination</h2>
                    <div className="grid gap-6">
-                      <div className="p-8 border-2 border-primary bg-primary/5 rounded-[2.5rem] relative group cursor-pointer shadow-xl">
-                         <div className="absolute top-6 right-6 text-primary">
-                            <CheckCircle2 size={24} />
-                         </div>
+                      <div 
+                        onClick={() => setSelectedAddress(0)}
+                        className={cn(
+                          "p-8 border-2 rounded-[2.5rem] relative group cursor-pointer shadow-xl transition-all duration-300",
+                          selectedAddress === 0 ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/20"
+                        )}
+                      >
+                         {selectedAddress === 0 && (
+                           <div className="absolute top-6 right-6 text-primary">
+                              <CheckCircle2 size={24} />
+                           </div>
+                         )}
                          <div className="flex items-center gap-4 mb-4">
-                            <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-primary-foreground">
+                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300", selectedAddress === 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
                                <MapPin size={24} />
                             </div>
                             <h4 className="font-black text-lg">Main Warehouse (Default)</h4>
@@ -407,7 +453,7 @@ export const CheckoutWizard = () => {
                          </p>
                       </div>
 
-                      <div className="p-8 border border-border border-dashed rounded-[2.5rem] flex items-center justify-center group hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer">
+                      <div className="p-8 border border-border border-dashed rounded-[2.5rem] flex items-center justify-center group hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer opacity-60">
                          <div className="flex flex-col items-center gap-4 py-4 text-muted-foreground group-hover:text-primary">
                             <Plus size={32} />
                             <span className="font-black text-sm uppercase tracking-widest">Add New Address</span>
@@ -422,11 +468,15 @@ export const CheckoutWizard = () => {
                            { name: 'PasarMitra Express', time: 'Today, 2-4 PM', price: 'FREE', icon: Truck },
                            { name: 'Same Day Freight', time: 'Within 4h', price: 'Rp 25.000', icon: Clock }
                          ].map((ship, i) => (
-                           <div key={i} className={cn(
-                             "p-6 rounded-3xl border transition-all cursor-pointer flex items-center gap-4",
-                             i === 0 ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-card hover:border-primary/20"
-                           )}>
-                              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", i === 0 ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                           <div 
+                             key={i} 
+                             onClick={() => setSelectedShipping(i)}
+                             className={cn(
+                               "p-6 rounded-3xl border transition-all cursor-pointer flex items-center gap-4 duration-300",
+                               selectedShipping === i ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-card hover:border-primary/20"
+                             )}
+                           >
+                              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300", selectedShipping === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
                                  <ship.icon size={24} />
                               </div>
                               <div className="flex-1">
@@ -456,12 +506,16 @@ export const CheckoutWizard = () => {
                         { name: 'Bank Transfer (BCA/Mandiri)', fee: 'No fee', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
                         { name: 'Balance / Wallet', fee: 'Instant', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' }
                       ].map((pay, i) => (
-                        <div key={i} className={cn(
-                          "p-8 border-2 rounded-[2.5rem] flex items-center justify-between transition-all cursor-pointer",
-                          i === 0 ? "border-primary bg-primary/5 shadow-xl" : "border-border bg-card"
-                        )}>
+                        <div 
+                          key={i} 
+                          onClick={() => setSelectedPayment(i)}
+                          className={cn(
+                            "p-8 border-2 rounded-[2.5rem] flex items-center justify-between transition-all cursor-pointer duration-300",
+                            selectedPayment === i ? "border-primary bg-primary/5 shadow-xl" : "border-border bg-card hover:border-primary/20"
+                          )}
+                        >
                            <div className="flex items-center gap-6">
-                              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center font-black", i === 0 ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center font-black transition-all duration-300", selectedPayment === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
                                  <CreditCard size={28} />
                               </div>
                               <div>
@@ -469,7 +523,7 @@ export const CheckoutWizard = () => {
                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{pay.fee}</p>
                               </div>
                            </div>
-                           {i === 0 && <CheckCircle2 className="text-primary" size={24} />}
+                           {selectedPayment === i && <CheckCircle2 className="text-primary" size={24} />}
                         </div>
                       ))}
                    </div>
@@ -491,17 +545,21 @@ export const CheckoutWizard = () => {
                             <ShieldCheck size={24} />
                             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Procurement Guarantee Active</span>
                          </div>
-                         <Button variant="ghost" onClick={() => setStep(0)} className="text-xs font-black text-primary">EDIT SHIPPING</Button>
+                         <Button variant="ghost" onClick={() => setStep(0)} className="text-xs font-black text-primary cursor-pointer">EDIT SHIPPING</Button>
                       </div>
                       <div className="space-y-6">
                          <div className="flex justify-between items-start">
                             <div className="space-y-1">
                                <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Delivery Address</p>
-                               <p className="font-bold">Jl. Menteng Raya No. 42 (Main Warehouse)</p>
+                               <p className="font-bold">
+                                 {selectedAddress === 0 ? 'Jl. Menteng Raya No. 42 (Main Warehouse)' : 'Alamat Kustom'}
+                               </p>
                             </div>
                             <div className="text-right space-y-1">
-                               <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Payment</p>
-                               <p className="font-bold">Credit Term (30d)</p>
+                               <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Payment Method</p>
+                               <p className="font-bold">
+                                 {selectedPayment === 0 ? 'Credit Term (30d)' : selectedPayment === 1 ? 'Bank Transfer' : 'Balance / Wallet'}
+                               </p>
                             </div>
                          </div>
                          <div className="pt-6 border-t border-border/30">
@@ -539,10 +597,10 @@ export const CheckoutWizard = () => {
                           </p>
                        </div>
                       <div className="flex gap-4 justify-center">
-                         <Button onClick={() => navigate('/orders')} className="h-14 px-10 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/30">
+                         <Button onClick={() => navigate('/orders')} className="h-14 px-10 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/30 cursor-pointer">
                             Track Order
                          </Button>
-                         <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-10 rounded-2xl border-border bg-background/50 backdrop-blur-xl font-black text-lg">
+                         <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-10 rounded-2xl border-border bg-background/50 backdrop-blur-xl font-black text-lg cursor-pointer">
                             Go Home
                          </Button>
                       </div>
@@ -554,22 +612,22 @@ export const CheckoutWizard = () => {
 
         {/* Sidebar Order Summary */}
         <div className="space-y-8">
-           <div className="p-10 bg-card border border-border/50 rounded-[3rem] shadow-2xl space-y-10 sticky top-10">
+           <div className="p-8 md:p-10 bg-card border border-border/50 rounded-[2.5rem] md:rounded-[3rem] shadow-2xl space-y-8 md:space-y-10 lg:sticky lg:top-10 max-h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
               <h3 className="text-2xl font-black tracking-tight">Order Summary</h3>
               <div className="space-y-6">
                  {items.length > 0 ? items.map((item) => (
-                   <div key={item.id} className="flex gap-4 group">
-                      <div className="w-14 h-14 rounded-xl bg-muted overflow-hidden shrink-0">
-                         <img src={item.image_url || `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=100`} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                         <p className="text-sm font-black truncate leading-tight group-hover:text-primary transition-colors">{item.name}</p>
-                         <p className="text-xs text-muted-foreground font-medium">{item.quantity} {item.unit_type}</p>
-                      </div>
-                      <p className="text-sm font-black italic">Rp {(item.price * item.quantity).toLocaleString()}</p>
-                   </div>
+                    <div key={item.id} className="flex gap-4 group">
+                       <div className="w-14 h-14 rounded-xl bg-muted overflow-hidden shrink-0">
+                          <img src={item.image_url || `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=100`} className="w-full h-full object-cover" />
+                       </div>
+                       <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black truncate leading-tight group-hover:text-primary transition-colors">{item.name}</p>
+                          <p className="text-xs text-muted-foreground font-medium">{item.quantity} {item.unit_type}</p>
+                       </div>
+                       <p className="text-sm font-black italic">Rp {(item.price * item.quantity).toLocaleString()}</p>
+                    </div>
                  )) : (
-                   <p className="text-muted-foreground italic font-medium">Cart is empty...</p>
+                    <p className="text-muted-foreground italic font-medium">Cart is empty...</p>
                  )}
               </div>
 
@@ -580,12 +638,16 @@ export const CheckoutWizard = () => {
                  </div>
                  <div className="flex justify-between text-sm font-bold text-muted-foreground">
                     <span>Shipping Fee</span>
-                    <span className="text-primary font-black uppercase">FREE</span>
+                    <span className="text-primary font-black uppercase">
+                      {selectedShipping === 1 ? 'Rp 25.000' : 'FREE'}
+                    </span>
                  </div>
                  <div className="pt-4 flex justify-between items-end border-t border-border/30">
                     <div className="space-y-1">
                        <p className="text-xs font-black text-primary uppercase tracking-widest">Total Payment</p>
-                       <p className="text-3xl font-black tracking-tighter">Rp {totalPrice().toLocaleString()}</p>
+                       <p className="text-3xl font-black tracking-tighter">
+                         Rp {(totalPrice() + getShippingCost()).toLocaleString()}
+                       </p>
                     </div>
                  </div>
               </div>
@@ -594,7 +656,7 @@ export const CheckoutWizard = () => {
                  <Button 
                    onClick={handleNext}
                    disabled={items.length === 0 || isSubmitting}
-                   className="w-full h-16 rounded-2xl bg-[#06110B] text-primary font-black text-xl shadow-2xl shadow-primary/20 border border-primary/20 hover:scale-105 active:scale-95 transition-all"
+                   className="w-full h-16 rounded-2xl bg-[#06110B] text-primary font-black text-xl shadow-2xl shadow-primary/20 border border-primary/20 hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer flex items-center justify-center"
                  >
                     {isSubmitting ? 'Memproses...' : step === 2 ? 'Place Order' : 'Continue'}
                     <ChevronRight size={24} className="ml-2" />
@@ -613,6 +675,13 @@ export const CheckoutWizard = () => {
            </div>
         </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.2); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.4); }
+      `}} />
     </div>
   );
 };

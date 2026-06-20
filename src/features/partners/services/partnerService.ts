@@ -7,6 +7,7 @@ import {
   doc, 
   getDoc 
 } from 'firebase/firestore';
+import { formatTime } from '../../../lib/dateUtils';
 import { db } from '../../../lib/firebase';
 
 export interface Partnership {
@@ -145,8 +146,8 @@ export const partnerService = {
           const latestMsg = msgs[0];
           lastMsg = latestMsg.text || '';
           if (latestMsg.created_at) {
-            const date = new Date(latestMsg.created_at);
-            time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            // View-model only — not persisted; use shared formatTime utility
+            time = formatTime(latestMsg.created_at);
           }
         }
       } catch (err) {

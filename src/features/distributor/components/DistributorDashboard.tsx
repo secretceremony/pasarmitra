@@ -1,32 +1,43 @@
 import React from 'react';
 import { 
-  TrendingUp, 
   Package, 
-  Users, 
   DollarSign, 
   ShoppingBag,
-  Truck,
   MessageSquareText,
-  ArrowUpRight,
-  ArrowDownRight,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { AnalyticsCard } from '../../../components/common/AnalyticsCard';
 import { Button } from '../../../components/ui/button';
 import { cn } from '../../../lib/utils';
+import { formatDateTime } from '../../../lib/dateUtils';
+
+interface Negotiation {
+  id: string;
+  negotiation_code: string;
+  distributor_id: string;
+  distributor_name: string;
+  umkm_id: string;
+  umkm_name: string;
+  product_id: string;
+  product_name: string;
+  original_unit_price: number;
+  requested_unit_price: number;
+  agreed_unit_price?: number;
+  quantity: number;
+  status: string;
+  latest_message: string;
+  latest_message_at: string;
+  created_at: string;
+}
 
 const RECENT_ORDERS = [
   { id: 'ORD-7721', buyer: 'Warung Barokah', amount: 'Rp 4.200.000', status: 'Pending', time: '2 mins ago' },
   { id: 'ORD-7720', buyer: 'Toko Kelontong Jaya', amount: 'Rp 12.500.000', status: 'Processing', time: '45 mins ago' },
   { id: 'ORD-7719', buyer: 'Minimarket Sejahtera', amount: 'Rp 8.900.000', status: 'Shipped', time: '3 hours ago' },
-];
-
-const PENDING_NEGOTIATIONS = [
-  { id: 'NEG-102', partner: 'Mitra UMKM Bandung', subject: 'Sugar Bulk Order', discount: '5%', status: 'Waiting' },
-  { id: 'NEG-101', partner: 'Retailer Jakarta Central', subject: 'Oil Tier 3 Pricing', discount: '2%', status: 'Offered' },
 ];
 
 import { useAuthStore } from '../../../store/use-auth-store';
@@ -45,6 +56,10 @@ export const DistributorDashboard = () => {
     completedOrders: 0
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
+  const [isLoadingNegotiations, setIsLoadingNegotiations] = useState(true);
+  const [negotiationsError, setNegotiationsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -89,6 +104,47 @@ export const DistributorDashboard = () => {
     };
 
     fetchStats();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const fetchNegotiations = async () => {
+      if (!user?.id) return;
+      try {
+        setIsLoadingNegotiations(true);
+        setNegotiationsError(null);
+        
+        const q = query(
+          collection(db, 'negotiations'),
+          where('distributor_id', '==', user.id)
+        );
+        const querySnapshot = await getDocs(q);
+        const list: Negotiation[] = [];
+        querySnapshot.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() } as Negotiation);
+        });
+
+        // Sort in memory by latest_message_at desc
+        list.sort((a, b) => {
+          const timeA = new Date(a.latest_message_at || a.created_at || 0).getTime();
+          const timeB = new Date(b.latest_message_at || b.created_at || 0).getTime();
+          return timeB - timeA;
+        });
+
+        // Filter active/open negotiations
+        const openList = list.filter(
+          (neg) => neg.status !== 'cancelled' && neg.status !== 'converted_to_order'
+        );
+
+        setNegotiations(openList.slice(0, 3));
+      } catch (err) {
+        console.error("Gagal memuat negosiasi:", err);
+        setNegotiationsError("Gagal memuat daftar negosiasi.");
+      } finally {
+        setIsLoadingNegotiations(false);
+      }
+    };
+
+    fetchNegotiations();
   }, [user?.id]);
 
   return (
@@ -138,9 +194,19 @@ export const DistributorDashboard = () => {
                 Add Product
              </Button>
            </Link>
-           <Button variant="outline" className="h-14 px-8 rounded-2xl border-border bg-card/40 font-black">
-              Export Reports
-           </Button>
+            <div className="relative group/tooltip">
+               <Button 
+                 disabled 
+                 aria-disabled="true"
+                 variant="outline" 
+                 className="h-14 px-8 rounded-2xl border-border bg-card/20 text-muted-foreground/60 font-black cursor-not-allowed opacity-50"
+               >
+                  Export Reports
+               </Button>
+               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] py-1.5 px-3 rounded-lg whitespace-nowrap z-50 shadow-lg border border-border/50 font-bold">
+                  Fitur ekspor laporan akan segera hadir
+               </div>
+            </div>
         </div>
       </div>
 
@@ -256,64 +322,82 @@ export const DistributorDashboard = () => {
           <div className="space-y-6">
              <h3 className="text-2xl font-black tracking-tight">Open Negotiations</h3>
              <div className="grid gap-4">
-                {PENDING_NEGOTIATIONS.map((neg) => (
-                  <div key={neg.id} className="p-4 sm:p-6 bg-primary/5 border border-primary/20 rounded-2xl sm:rounded-[2rem] space-y-4 shadow-sm">
-                     <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground">
-                              <MessageSquareText size={18} />
-                           </div>
-                           <div>
-                              <p className="font-black text-sm">{neg.partner}</p>
-                              <p className="text-xs text-muted-foreground font-medium">{neg.subject}</p>
-                           </div>
-                        </div>
-                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">{neg.status}</span>
-                     </div>
-                     <div className="flex items-center justify-between bg-black/5 p-4 rounded-2xl">
-                        <span className="text-xs font-bold text-muted-foreground">Requesting</span>
-                        <span className="text-sm font-black text-primary">-{neg.discount} Discount</span>
-                     </div>
-                      <div className="flex gap-3">
-                         <Link to="/negotiations" className="flex-1">
-                           <Button className="w-full h-10 rounded-xl bg-primary text-white text-xs font-black">Counter</Button>
-                         </Link>
-                         <Link to="/negotiations" className="flex-1">
-                           <Button variant="outline" className="w-full h-10 rounded-xl text-xs font-black">Reject</Button>
-                         </Link>
-                      </div>
+                {isLoadingNegotiations ? (
+                  <div className="p-8 text-center bg-card border border-border/50 rounded-[2rem] flex flex-col items-center justify-center gap-3">
+                     <Loader2 className="animate-spin text-primary" size={24} />
+                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Menyelaraskan data...</p>
                   </div>
-                ))}
+                ) : negotiationsError ? (
+                  <div className="p-8 text-center bg-rose-500/5 border border-rose-500/20 rounded-[2rem] flex flex-col items-center justify-center gap-2 text-rose-600">
+                     <AlertCircle size={24} />
+                     <p className="text-xs font-bold">{negotiationsError}</p>
+                  </div>
+                ) : negotiations.length === 0 ? (
+                  <div className="p-8 text-center bg-card border border-border/50 rounded-[2rem] flex flex-col items-center justify-center gap-3 text-muted-foreground/60">
+                     <MessageSquareText size={28} className="opacity-40" />
+                     <p className="text-xs font-bold">Tidak ada negosiasi aktif saat ini.</p>
+                  </div>
+                ) : (
+                  negotiations.map((neg) => {
+                    const priceRequested = neg.requested_unit_price || 0;
+                    const priceOriginal = neg.original_unit_price || 0;
+                    const discountPercentage = priceOriginal > 0 
+                      ? Math.round(((priceOriginal - priceRequested) / priceOriginal) * 100)
+                      : 0;
+
+                    const dateFormatted = formatDateTime(neg.latest_message_at || neg.created_at);
+
+                    return (
+                      <div key={neg.id} className="p-4 sm:p-6 bg-primary/5 border border-primary/20 rounded-2xl sm:rounded-[2rem] space-y-4 shadow-sm">
+                         <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3 min-w-0">
+                               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shrink-0">
+                                  <MessageSquareText size={18} />
+                               </div>
+                               <div className="min-w-0">
+                                  <p className="font-black text-sm truncate">{neg.umkm_name || 'Pembeli UMKM'}</p>
+                                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                     <p className="text-xs text-muted-foreground font-medium truncate max-w-[110px]">{neg.product_name || 'Produk'}</p>
+                                     {dateFormatted && (
+                                       <>
+                                         <span className="text-muted-foreground/30 text-xs">•</span>
+                                         <p className="text-[10px] text-muted-foreground/70 font-semibold shrink-0">
+                                            {dateFormatted}
+                                         </p>
+                                       </>
+                                     )}
+                                  </div>
+                               </div>
+                            </div>
+                            <span className="text-[10px] font-black text-primary uppercase tracking-widest shrink-0">{neg.status}</span>
+                         </div>
+                         <div className="flex items-center justify-between bg-black/5 p-4 rounded-2xl text-xs gap-4">
+                            <div className="min-w-0">
+                               <p className="text-[10px] text-muted-foreground font-medium truncate">Jumlah: {neg.quantity || 1} unit</p>
+                               <p className="font-bold text-muted-foreground/80 line-through mt-0.5 truncate">Rp {priceOriginal.toLocaleString('id-ID')}</p>
+                            </div>
+                            <div className="text-right shrink-0">
+                               {discountPercentage > 0 && (
+                                 <span className="bg-primary/20 text-primary text-[10px] font-black px-1.5 py-0.5 rounded mr-2">-{discountPercentage}% Nego</span>
+                               )}
+                               <span className="text-sm font-black text-primary">Rp {priceRequested.toLocaleString('id-ID')}</span>
+                            </div>
+                         </div>
+                          <div className="flex gap-3">
+                             <Link to="/negotiations" className="flex-1">
+                               <Button className="w-full h-10 rounded-xl bg-primary text-white text-xs font-black">Counter</Button>
+                             </Link>
+                             <Link to="/negotiations" className="flex-1">
+                               <Button variant="outline" className="w-full h-10 rounded-xl text-xs font-black">Reject</Button>
+                             </Link>
+                          </div>
+                      </div>
+                    );
+                  })
+                )}
              </div>
           </div>
 
-          {/* Quick Tasks */}
-          <div className="p-6 sm:p-8 bg-card border border-border/50 rounded-3xl sm:rounded-[2.5rem] space-y-6">
-             <h4 className="font-black text-xl">Operational Checklist</h4>
-             <div className="space-y-4">
-                {[
-                  { label: 'Update Stock Levels', completed: true },
-                  { label: 'Upload Invoice #PM-102', completed: false },
-                  { label: 'Verify KM Retailer', completed: false },
-                  { label: 'Export Tax Statement', completed: false }
-                ].map((task, i) => (
-                  <div key={i} className="flex items-center gap-4 group cursor-pointer">
-                     <div className={cn(
-                       "w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all",
-                       task.completed ? "bg-primary border-primary text-primary-foreground" : "border-border group-hover:border-primary"
-                     )}>
-                        {task.completed && <CheckCircle2 size={14} />}
-                     </div>
-                     <span className={cn("text-sm font-bold", task.completed ? "text-muted-foreground line-through" : "text-foreground")}>
-                        {task.label}
-                     </span>
-                  </div>
-                ))}
-             </div>
-             <Button variant="outline" className="w-full h-12 rounded-2xl border-border font-black text-sm uppercase tracking-widest">
-                Add Task
-             </Button>
-          </div>
         </div>
       </div>
     </div>

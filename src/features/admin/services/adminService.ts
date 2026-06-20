@@ -13,14 +13,8 @@ export interface AuditLogData {
 
 export const createAuditLog = async (logData: Omit<AuditLogData, 'ip'>) => {
   try {
-    const timestamp = new Date().toLocaleString('id-ID', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+    // Store as ISO string; display formatting happens in the UI layer via formatDateTime
+    const timestamp = new Date().toISOString();
 
     const docData = {
       ...logData,

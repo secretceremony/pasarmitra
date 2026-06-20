@@ -1,10 +1,42 @@
 import * as React from "react";
 import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/button";
 import { MARKETPLACE_HERO_CONFIG, MARKETPLACE_ANIMATIONS } from "../config/marketplace-ui.config";
 
-export function MarketplaceHeroBanner() {
+interface MarketplaceHeroBannerProps {
+  onViewSuppliers?: () => void;
+}
+
+export function MarketplaceHeroBanner({ onViewSuppliers }: MarketplaceHeroBannerProps) {
+  const navigate = useNavigate();
+
+  const handleBrowseInventory = () => {
+    const el = document.getElementById("marketplace-toolbar");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 400, behavior: "smooth" });
+    }
+  };
+
+  const handleViewVerifiedSellers = () => {
+    if (onViewSuppliers) {
+      onViewSuppliers();
+      return;
+    }
+    // TEMPORARY: Since the main verified suppliers listing resides on the dashboard page,
+    // we route to the dashboard and trigger a smooth scroll down to the suppliers section.
+    navigate("/umkm/dashboard");
+    setTimeout(() => {
+      const el = document.getElementById("verified-suppliers-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 150);
+  };
+
   return (
     <motion.div 
       initial={MARKETPLACE_ANIMATIONS.heroEnter}
@@ -27,11 +59,18 @@ export function MarketplaceHeroBanner() {
            </h1>
            <p className="text-xs sm:text-sm md:text-lg text-white/70 font-medium leading-relaxed line-clamp-2 sm:line-clamp-none">{MARKETPLACE_HERO_CONFIG.description}</p>
            <div className="flex flex-wrap gap-2 md:gap-4 pt-2 md:pt-4">
-              <Button className="h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl bg-accent text-accent-foreground hover:bg-white hover:text-black shadow-2xl shadow-accent/20 font-black tracking-tight flex gap-2 text-xs sm:text-sm md:text-base">
+              <Button 
+                onClick={handleBrowseInventory}
+                className="h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl bg-accent text-accent-foreground hover:bg-white hover:text-black shadow-2xl shadow-accent/20 font-black tracking-tight flex gap-2 text-xs sm:text-sm md:text-base cursor-pointer"
+              >
                  {MARKETPLACE_HERO_CONFIG.ctaPrimary}
                  <ArrowRight size={18} />
               </Button>
-              <Button variant="outline" className="h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl bg-white/5 backdrop-blur-md border border-white/20 text-white font-black text-xs sm:text-sm md:text-base">
+              <Button 
+                variant="outline" 
+                onClick={handleViewVerifiedSellers}
+                className="h-12 md:h-14 px-6 md:px-10 rounded-xl md:rounded-2xl bg-white/5 backdrop-blur-md border border-white/20 text-white font-black text-xs sm:text-sm md:text-base cursor-pointer"
+              >
                  {MARKETPLACE_HERO_CONFIG.ctaSecondary}
               </Button>
            </div>
@@ -40,3 +79,4 @@ export function MarketplaceHeroBanner() {
     </motion.div>
   );
 }
+

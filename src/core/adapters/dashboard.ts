@@ -31,6 +31,9 @@ export const dashboardAdapters = {
       },
       image: raw.image,
       discountTag: raw.discount,
+      description: raw.description,
+      category: raw.category,
+      tiered_pricing: raw.tiered_pricing
     };
   },
 

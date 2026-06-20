@@ -23,9 +23,18 @@ export function PremiumPromo() {
                    Access exclusive pre-market releases from PT. Salim Ivomas.
                 </p>
              </div>
-             <Button className="bg-[#D4AF37] text-black font-black rounded-2xl hover:bg-[#D4AF37]/90 px-8 md:px-12 h-12 md:h-14 text-sm md:text-lg shadow-xl shadow-[#D4AF37]/20">
-               Join Network
-             </Button>
+             <div className="relative group/tooltip w-fit">
+               <Button 
+                 disabled 
+                 aria-disabled="true"
+                 className="bg-[#D4AF37] text-black font-black rounded-2xl px-8 md:px-12 h-12 md:h-14 text-sm md:text-lg shadow-xl opacity-50 cursor-not-allowed"
+               >
+                 Join Network
+               </Button>
+               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] py-1.5 px-3 rounded-lg whitespace-nowrap z-50 shadow-lg border border-border/50 font-bold">
+                 Kemitraan Premium segera hadir
+               </div>
+             </div>
           </div>
           <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-[#D4AF37]/10 rounded-full blur-[100px] group-hover:bg-[#D4AF37]/20 transition-all duration-700" />
           <Users className="absolute top-10 right-10 text-[#D4AF37]/5 shrink-0 transform -rotate-12 transition-transform group-hover:rotate-0 duration-700" size={240} />

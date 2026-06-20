@@ -3,9 +3,12 @@ import { CheckCircle2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Surface } from "../../../shared/ui/Surface";
 import { motion } from "motion/react";
+import { useNavigate } from "react-router-dom";
 import { FADE_UP } from "../../../core/animations";
 
 export function HeroSection() {
+  const navigate = useNavigate();
+
   return (
     <motion.div {...FADE_UP}>
       <Surface intent="none" padding="none" className="relative h-[320px] sm:h-[380px] md:h-[440px] overflow-hidden group">
@@ -28,10 +31,17 @@ export function HeroSection() {
                 The largest ecosystem for verified distributors and retailers in Indonesia. Direct connection, wholesale pricing.
               </p>
               <div className="flex flex-wrap gap-2 md:gap-4 pt-2 md:pt-4">
-                 <Button className="h-12 md:h-16 px-6 md:px-12 rounded-xl md:rounded-2xl bg-primary text-primary-foreground font-black text-sm md:text-xl shadow-2xl shadow-primary/30 hover:scale-105 transition-transform">
+                 <Button 
+                   onClick={() => navigate('/marketplace')}
+                   className="h-12 md:h-16 px-6 md:px-12 rounded-xl md:rounded-2xl bg-primary text-primary-foreground font-black text-sm md:text-xl shadow-2xl shadow-primary/30 hover:scale-105 transition-transform cursor-pointer"
+                 >
                     Explore Products
                  </Button>
-                 <Button variant="outline" className="h-12 md:h-16 px-6 md:px-12 rounded-xl md:rounded-2xl bg-white/5 backdrop-blur-md border-white/10 text-white font-black text-sm md:text-xl hover:bg-white/10">
+                 <Button 
+                   variant="outline" 
+                   onClick={() => navigate('/marketplace')}
+                   className="h-12 md:h-16 px-6 md:px-12 rounded-xl md:rounded-2xl bg-white/5 backdrop-blur-md border-white/10 text-white font-black text-sm md:text-xl hover:bg-white/10 cursor-pointer"
+                 >
                     Find Distributors
                  </Button>
               </div>
@@ -41,3 +51,4 @@ export function HeroSection() {
     </motion.div>
   );
 }
+

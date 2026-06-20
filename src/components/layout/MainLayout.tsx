@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -69,9 +69,10 @@ const ADMIN_NAV_ITEMS = [
   { label: 'Admin Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
-  { label: 'Moderasi Produk', href: '/admin/moderation', icon: Box },
-  { label: 'Finances', href: '/admin/finances', icon: Wallet },
-  { label: 'Disputes', href: '/admin/disputes', icon: Handshake },
+  { label: 'Platform Finance', href: '/admin/finances', icon: Wallet },
+  { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
+  { label: 'Moderation System', href: '/admin/moderation', icon: Handshake },
+  { label: 'Disputes / Refunds', href: '/admin/disputes', icon: ShieldCheck },
   { label: 'Audit Logs', href: '/admin/audit', icon: Settings },
   { label: 'Profile / Settings', href: '/admin/profile', icon: Settings },
 ];
@@ -88,12 +89,71 @@ export const MainLayout = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showCart, setShowCart] = useState(false);
 
+  const sidebarRef = useRef<HTMLElement>(null);
+  const cartButtonRef = useRef<HTMLButtonElement>(null);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1280);
+
   const isAdmin = user?.role === 'ADMIN';
   const isDistributor = user?.role === 'DISTRIBUTOR';
   
   let navItems = UMKM_NAV_ITEMS;
   if (isAdmin) navItems = ADMIN_NAV_ITEMS;
   else if (isDistributor) navItems = DISTRIBUTOR_NAV_ITEMS;
+
+  useEffect(() => {
+    const handleResize = () => {
+      const desktop = window.innerWidth >= 1280;
+      setIsDesktop(desktop);
+      if (desktop) {
+        document.body.style.overflow = '';
+      } else if (rightSidebarOpen && user?.role === 'UMKM') {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // run initially
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.body.style.overflow = '';
+    };
+  }, [rightSidebarOpen, user?.role]);
+
+  // Click outside and keydown listeners (overlay mode only for UMKM sidebar)
+  useEffect(() => {
+    if (user?.role !== 'UMKM') return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (window.innerWidth >= 1280) return; // Only close click-outside in overlay mode
+      
+      if (
+        rightSidebarOpen &&
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node) &&
+        cartButtonRef.current &&
+        !cartButtonRef.current.contains(event.target as Node)
+      ) {
+        setRightSidebarOpen(false);
+        cartButtonRef.current?.focus();
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (window.innerWidth >= 1280) return; // Escape key behavior for overlay only
+      if (event.key === 'Escape' && rightSidebarOpen) {
+        setRightSidebarOpen(false);
+        cartButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [rightSidebarOpen, user?.role]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans text-foreground overflow-x-hidden">
@@ -166,7 +226,7 @@ export const MainLayout = () => {
             <Menu size={20} />
           </button>
 
-          <div className="flex-1 max-w-3xl flex items-center gap-2 md:gap-4">
+          <div className="hidden sm:flex flex-1 max-w-3xl items-center gap-2 md:gap-4">
              <div className="relative flex-1 group">
                 <Search className="absolute left-3.5 md:left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors w-4 h-4 md:w-5 md:h-5" />
                 <input 
@@ -174,7 +234,7 @@ export const MainLayout = () => {
                   placeholder={isAdmin ? "Cari pengguna, distributor, produk, invoice, atau transaksi..." : "Search products, distributors or brands..."} 
                   className="w-full bg-card/60 border border-border/50 focus:border-primary/40 focus:bg-card pl-10 pr-4 md:px-14 py-2.5 md:py-4 rounded-2xl md:rounded-3xl text-xs md:text-sm transition-all focus:outline-none shadow-sm font-bold tracking-tight h-10 md:h-14"
                 />
-             </div>
+              </div>
           </div>
 
           <div className="flex items-center gap-1.5 md:gap-4">
@@ -219,6 +279,7 @@ export const MainLayout = () => {
                 )}
                 {user?.role === 'UMKM' && (
                   <Button 
+                    ref={cartButtonRef}
                     variant="outline" 
                     size="icon" 
                     className={cn("h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all relative", rightSidebarOpen && "bg-primary/10 border-primary/20 text-primary")}
@@ -235,6 +296,7 @@ export const MainLayout = () => {
                      )}
                   </Button>
                 )}
+
               </>
             )}
 
@@ -262,29 +324,37 @@ export const MainLayout = () => {
 
           {/* Right Sidebar */}
           <AnimatePresence>
-            {!isAdmin && rightSidebarOpen && (
-              <motion.aside
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 440, opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                className="hidden xl:flex flex-col bg-card/60 border-l border-border h-full overflow-hidden backdrop-blur-3xl sticky top-0"
-              >
-                {!isDistributor ? (
-                  <CartSidebar onClose={() => setRightSidebarOpen(false)} />
-                ) : (
-                  <div className="p-10 flex flex-col h-full space-y-10">
-                     <div className="flex items-center justify-between">
-                        <h3 className="font-black text-2xl tracking-tighter">Distributor Pulse</h3>
-                        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setRightSidebarOpen(false)}><X size={20} /></Button>
-                     </div>
-                     <div className="space-y-8 flex-1 overflow-y-auto custom-scrollbar pr-2">
-                        <div className="p-6 bg-card border border-border/50 rounded-[2rem]">
-                           <p className="font-black">No alerts.</p>
-                        </div>
-                     </div>
-                  </div>
+            {user?.role === 'UMKM' && rightSidebarOpen && (
+              <>
+                {/* Backdrop for mobile/tablet overlay mode */}
+                {!isDesktop && (
+                  <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+                    onClick={() => {
+                      setRightSidebarOpen(false);
+                      cartButtonRef.current?.focus();
+                    }}
+                  />
                 )}
-              </motion.aside>
+                <motion.aside
+                  ref={sidebarRef}
+                  initial={isDesktop ? { width: 0, opacity: 0 } : { x: '100%', opacity: 0 }}
+                  animate={isDesktop ? { width: 440, opacity: 1 } : { x: 0, opacity: 1 }}
+                  exit={isDesktop ? { width: 0, opacity: 0 } : { x: '100%', opacity: 0 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className={cn(
+                    "flex flex-col bg-card/95 border-l border-border h-full overflow-hidden backdrop-blur-3xl transition-all duration-300",
+                    isDesktop 
+                      ? "w-[440px] sticky top-0" 
+                      : "fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[440px] shadow-2xl"
+                  )}
+                >
+                  <CartSidebar onClose={() => {
+                    setRightSidebarOpen(false);
+                    cartButtonRef.current?.focus();
+                  }} />
+                </motion.aside>
+              </>
             )}
           </AnimatePresence>
         </div>

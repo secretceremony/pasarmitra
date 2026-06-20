@@ -7,12 +7,14 @@ interface WholesaleDealsProps {
   deals: ProductSummary[];
   onQuickAdd?: (product: ProductSummary) => void;
   onViewAll?: () => void;
+  onViewDetails?: (product: ProductSummary) => void;
 }
 
 export function WholesaleDeals({
   deals,
   onQuickAdd,
   onViewAll,
+  onViewDetails,
 }: WholesaleDealsProps) {
   return (
     <MarketplaceSection
@@ -27,6 +29,7 @@ export function WholesaleDeals({
             key={deal.id}
             product={deal}
             onQuickAdd={onQuickAdd}
+            onViewDetails={onViewDetails}
           />
         ))}
       </div>

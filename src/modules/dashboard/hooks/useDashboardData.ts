@@ -49,6 +49,9 @@ export function useDashboardData() {
           unit: data.unit_type || 'Unit',
           image: data.image_url || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=400',
           discount: data.discount_tag || '',
+          description: data.description || '',
+          category: data.category || 'Sembako',
+          tiered_pricing: data.tiered_pricing || []
         });
       }
       

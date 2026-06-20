@@ -23,6 +23,7 @@ import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../services/adminService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
+import { formatDateTime } from '../../../lib/dateUtils';
 
 import { useSearchParams } from 'react-router-dom';
 
@@ -50,11 +51,7 @@ export const DistributorVerification = () => {
             id: doc.id,
             company: data.organization_name || data.full_name || 'PT. Tanpa Nama',
             type: 'DISTRIBUTOR PERUSAHAAN',
-            submitted: (data.updated_at || data.created_at) ? new Date(data.updated_at || data.created_at).toLocaleDateString('id-ID', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric'
-            }) : 'Baru Saja',
+            submitted: formatDateTime(data.updated_at || data.created_at),
             status: data.is_verified ? 'VERIFIED' : (data.verification_status || 'PENDING_REVIEW'),
             is_verified: data.is_verified || false,
             documents: [

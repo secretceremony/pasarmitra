@@ -77,6 +77,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+    // Revenue breakdown collection
+    match /revenue_breakdown/{docId} {
+      allow read: if isAuthenticated();
+    }
 
     // Chat Rooms and Messages (general check)
     match /rooms/{roomId} {
@@ -96,6 +100,18 @@ service cloud.firestore {
     }
     
     match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /negotiations/{negotiationId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    match /presence/{userId} {
       allow read, write: if isAuthenticated();
     }
   }

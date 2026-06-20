@@ -21,6 +21,7 @@ import { db } from '../../../lib/firebase';
 import { Product } from '../../inventory/services/inventoryService';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { NegotiationModal } from '../../partners/components/NegotiationModal';
+import { useMarketplaceCart } from '../hooks/useMarketplaceCart';
 
 interface Distributor {
   id: string;
@@ -39,6 +40,7 @@ export const DistributorProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { handleAddToCart } = useMarketplaceCart();
   const [distributor, setDistributor] = useState<Distributor | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -152,9 +154,19 @@ export const DistributorProfile = () => {
                      Negosiasi Harga
                   </Button>
                )}
-               <Button variant="outline" className="h-14 px-8 rounded-2xl border-border bg-card/60 backdrop-blur-xl font-black text-lg">
-                  Ajukan Kemitraan
-               </Button>
+                <div className="relative group/tooltip w-fit">
+                   <Button 
+                      disabled 
+                      aria-disabled="true"
+                      variant="outline" 
+                      className="h-14 px-8 rounded-2xl border-border bg-card/40 text-muted-foreground/60 font-black text-lg cursor-not-allowed opacity-50"
+                   >
+                      Ajukan Kemitraan
+                   </Button>
+                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] py-1.5 px-3 rounded-lg whitespace-nowrap z-50 shadow-lg border border-border/50 font-bold">
+                      Fitur kemitraan eksklusif segera hadir
+                   </div>
+                </div>
             </div>
          </div>
       </div>
@@ -238,42 +250,64 @@ export const DistributorProfile = () => {
                ) : (
                  <div className="grid sm:grid-cols-2 gap-8">
                     {products.map((prod) => (
-                      <motion.div 
-                        key={prod.id}
-                        whileHover={{ y: -8 }}
-                        className="bg-card border border-border/50 rounded-[2.5rem] overflow-hidden group shadow-xl"
-                      >
-                         <div className="relative h-64">
-                            <img src={prod.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={prod.name} />
-                            <div className="absolute top-6 left-6">
-                               <span className="px-4 py-1 bg-black/40 backdrop-blur-md text-white rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">Tersedia</span>
-                            </div>
-                            <button className="absolute bottom-6 right-6 w-14 h-14 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all shadow-2xl">
-                               <ShoppingBag size={24} />
-                            </button>
-                         </div>
-                         <div className="p-8 space-y-4">
-                            <h4 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{prod.name}</h4>
-                             <div className="flex items-center justify-between">
-                                <div>
-                                   <p className="text-3xl font-black">Rp {prod.price.toLocaleString()}</p>
-                                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Per {prod.unit_type}</p>
-                                </div>
-                                <div className="text-right">
-                                   <p className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm cursor-pointer hover:bg-primary hover:text-white transition-all">Harga Bertingkat</p>
-                                </div>
+                       <motion.div 
+                         key={prod.id}
+                         whileHover={{ y: -8 }}
+                         className="bg-card border border-border/50 rounded-3xl overflow-hidden group shadow-xl flex flex-col h-full"
+                       >
+                          <div className="relative aspect-square overflow-hidden bg-muted">
+                             <img src={prod.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={prod.name} />
+                             <div className="absolute top-4 left-4">
+                                <span className="px-3 py-1 bg-black/40 backdrop-blur-md text-white rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">Tersedia</span>
                              </div>
                              {user?.role === 'UMKM' && (
-                                <Button 
-                                   variant="outline" 
-                                   className="w-full mt-4 h-12 rounded-2xl border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground font-black text-xs uppercase tracking-wider"
-                                   onClick={() => setSelectedNegotiateProduct({ ...prod, distributor_name: distributor.name })}
+                                <button 
+                                  onClick={() => handleAddToCart({
+                                    id: prod.id,
+                                    name: prod.name,
+                                    price: prod.price,
+                                    category: prod.category || 'Grains',
+                                    image: prod.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400',
+                                    rating: 4.7,
+                                    bulk: `${prod.min_order_quantity} ${prod.unit_type}`,
+                                    unit: prod.unit_type,
+                                    distributor: distributor.name,
+                                    distributorId: distributor.id,
+                                    stock: prod.stock
+                                  })}
+                                  className="absolute bottom-4 right-4 w-12 h-12 bg-white/10 backdrop-blur-2xl rounded-xl flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all shadow-2xl cursor-pointer"
+                                  title="Tambah ke Keranjang"
                                 >
-                                   Negosiasi Harga
-                                </Button>
+                                   <ShoppingBag size={20} />
+                                </button>
                              )}
                           </div>
-                      </motion.div>
+                          <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
+                             <div className="space-y-2">
+                                <h4 className="text-base sm:text-lg font-black tracking-tight group-hover:text-primary transition-colors line-clamp-2">{prod.name}</h4>
+                             </div>
+                             <div className="space-y-3 mt-auto pt-3 border-t border-border/20">
+                                <div className="flex items-center justify-between gap-2">
+                                   <div>
+                                      <p className="text-xl sm:text-2xl font-black">Rp {prod.price.toLocaleString()}</p>
+                                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Per {prod.unit_type}</p>
+                                   </div>
+                                   <div className="text-right shrink-0">
+                                      <p className="text-[9px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm">Harga Bertingkat</p>
+                                   </div>
+                                </div>
+                                {user?.role === 'UMKM' && (
+                                   <Button 
+                                      variant="outline" 
+                                      className="w-full h-10 rounded-xl border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground font-black text-[10px] uppercase tracking-wider"
+                                      onClick={() => setSelectedNegotiateProduct({ ...prod, distributor_name: distributor.name })}
+                                   >
+                                      Negosiasi Harga
+                                   </Button>
+                                )}
+                             </div>
+                          </div>
+                       </motion.div>
                     ))}
                  </div>
                )}

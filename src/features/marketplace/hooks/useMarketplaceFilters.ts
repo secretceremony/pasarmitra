@@ -1,13 +1,47 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MarketplaceProduct } from '../types/product.types';
 import { inventoryService } from '../../inventory/services/inventoryService';
+import { CATEGORIES } from '../data/categories';
 
 export function useMarketplaceFilters() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const categoryParam = queryParams.get('category');
+
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync state from query parameters on load/change
+  useEffect(() => {
+    if (categoryParam) {
+      const decoded = decodeURIComponent(categoryParam);
+      const isValid = (CATEGORIES as readonly string[]).includes(decoded);
+      if (isValid) {
+        setSelectedCategory(decoded);
+      } else {
+        setSelectedCategory('All');
+      }
+    } else {
+      setSelectedCategory('All');
+    }
+  }, [categoryParam]);
+
+  // Set category and update URL param reactively
+  const handleSetSelectedCategory = useCallback((newCat: string) => {
+    setSelectedCategory(newCat);
+    const params = new URLSearchParams(location.search);
+    if (newCat === 'All') {
+      params.delete('category');
+    } else {
+      params.set('category', newCat);
+    }
+    navigate({ search: params.toString() }, { replace: true });
+  }, [location.search, navigate]);
 
   const fetchActiveProducts = useCallback(async () => {
     try {
@@ -53,14 +87,14 @@ export function useMarketplaceFilters() {
 
   const resetFilters = useCallback(() => {
     setSearch('');
-    setSelectedCategory('All');
-  }, []);
+    handleSetSelectedCategory('All');
+  }, [handleSetSelectedCategory]);
 
   return {
     search,
     setSearch,
     selectedCategory,
-    setSelectedCategory,
+    setSelectedCategory: handleSetSelectedCategory,
     products,
     filteredProducts,
     isLoading,
@@ -69,3 +103,4 @@ export function useMarketplaceFilters() {
     refetch: fetchActiveProducts
   };
 }
+
