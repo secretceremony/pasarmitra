@@ -6,13 +6,9 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle, 
-  AlertTriangle,
   Building2,
   MapPin,
   ExternalLink,
-  ChevronRight,
-  ChevronLeft,
-  ArrowRight,
   Scale,
   Gavel,
   History,
@@ -26,6 +22,9 @@ import { StatusBadge } from '../../../components/common/StatusBadge';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../services/adminService';
 import { cn } from '../../../lib/utils';
+import { toast } from 'sonner';
+
+import { useSearchParams } from 'react-router-dom';
 
 export const DistributorVerification = () => {
   const [applications, setApplications] = useState<any[]>([]);
@@ -34,6 +33,9 @@ export const DistributorVerification = () => {
   const [auditNote, setAuditNote] = useState('');
   const [search, setSearch] = useState('');
   const { user: currentUser } = useAuthStore();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [searchParams] = useSearchParams();
+  const urlUserId = searchParams.get('userId');
 
   const fetchApplications = async () => {
     try {
@@ -56,11 +58,12 @@ export const DistributorVerification = () => {
             status: data.is_verified ? 'VERIFIED' : (data.verification_status || 'PENDING_REVIEW'),
             is_verified: data.is_verified || false,
             documents: [
-              { name: 'Nomor Induk Berusaha (NIB)', status: data.nib ? 'TAMPILKAN' : 'MENUNGGU' },
-              { name: 'NPWP Perusahaan', status: data.npwp ? 'TAMPILKAN' : 'MENUNGGU' },
-              { name: 'Izin Operasional Gudang', status: 'MENUNGGU' }
+              { name: 'Nomor Induk Berusaha (NIB)', status: data.nib ? 'APPROVED' : 'MISSING', url: data.nib_url || null },
+              { name: 'NPWP Perusahaan', status: data.npwp ? 'APPROVED' : 'MISSING', url: data.npwp_url || null },
+              { name: 'Izin Operasional Gudang', status: data.warehouse_permit ? 'APPROVED' : 'MISSING', url: data.warehouse_permit_url || null }
             ],
-            requestedBadge: data.requested_badge || 'Premium Fast Shipper',
+            requestedBadge: data.requested_badge || null,
+            submittedAt: data.created_at || null,
             location: data.address || 'Indonesia'
           });
         }
@@ -77,90 +80,127 @@ export const DistributorVerification = () => {
     fetchApplications();
   }, []);
 
+  useEffect(() => {
+    if (urlUserId && applications.some(app => app.id === urlUserId)) {
+      setSelectedId(urlUserId);
+    } else if (applications.length > 0 && !selectedId) {
+      setSelectedId(applications[0].id);
+    }
+  }, [urlUserId, applications]);
+
   const selected = applications.find(v => v.id === selectedId);
 
   const handleApprove = async () => {
     if (!selectedId) return;
+
+    // Guard: do not allow re-approving an already-verified distributor
+    if (selected?.is_verified) {
+      toast.error('Distributor ini sudah terverifikasi.');
+      return;
+    }
+
+    if (!window.confirm('Yakin ingin menyetujui verifikasi distributor ini?')) return;
+    setIsProcessing(true);
     try {
       const docRef = doc(db, 'profiles', selectedId);
-      await updateDoc(docRef, { 
+      await updateDoc(docRef, {
         is_verified: true,
         verification_status: 'VERIFIED',
-        audit_note: auditNote
-      });
-      
-      // Catat log
-      await createAuditLog({
-        event: 'VERIFIKASI_SETUJU',
-        status: 'SUCCESS',
-        user: currentUser?.email || 'System Admin',
-        details: `Menyetujui verifikasi distributor ${selected?.company || ''} dengan catatan: ${auditNote || 'Tidak ada catatan'}`
+        audit_note: auditNote || null
       });
 
-      alert('Distributor berhasil diverifikasi!');
+      await createAuditLog({
+        event: 'DISTRIBUTOR_VERIFICATION_APPROVED',
+        status: 'SUCCESS',
+        user: currentUser?.email || 'System Admin',
+        details: `Menyetujui verifikasi distributor ${selected?.company || ''} (ID: ${selectedId})${auditNote ? ` — Catatan: ${auditNote}` : ''}`,
+        targetCollection: 'profiles',
+        targetId: selectedId
+      });
+
+      toast.success('Distributor berhasil diverifikasi!');
       setAuditNote('');
       setSelectedId(null);
       fetchApplications();
     } catch (err) {
-      console.error("Gagal menyetujui verifikasi:", err);
+      console.error('Gagal menyetujui verifikasi:', err);
+      toast.error('Gagal menyetujui verifikasi');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleReject = async () => {
     if (!selectedId) return;
     if (!auditNote.trim()) {
-      alert('Anda wajib menuliskan alasan penolakan pada kolom Catatan Audit Internal terlebih dahulu.');
+      toast.error('Catatan wajib diisi untuk penolakan atau eskalasi.');
       return;
     }
+    if (!window.confirm('Yakin ingin menolak pengajuan verifikasi ini?')) return;
+    setIsProcessing(true);
     try {
       const docRef = doc(db, 'profiles', selectedId);
-      await updateDoc(docRef, { 
+      await updateDoc(docRef, {
         is_verified: false,
         verification_status: 'REJECTED',
         rejection_reason: auditNote,
         audit_note: auditNote
       });
 
-      // Catat log
       await createAuditLog({
-        event: 'VERIFIKASI_TOLAK',
+        event: 'DISTRIBUTOR_VERIFICATION_REJECTED',
         status: 'WARNING',
         user: currentUser?.email || 'System Admin',
-        details: `Menolak verifikasi distributor ${selected?.company || ''} dengan alasan: ${auditNote}`
+        details: `Menolak verifikasi distributor ${selected?.company || ''} (ID: ${selectedId}) — Alasan: ${auditNote}`,
+        targetCollection: 'profiles',
+        targetId: selectedId
       });
 
-      alert('Pendaftaran distributor ditolak.');
+      toast.success('Pengajuan distributor ditolak.');
       setAuditNote('');
       setSelectedId(null);
       fetchApplications();
     } catch (err) {
-      console.error("Gagal menolak verifikasi:", err);
+      console.error('Gagal menolak verifikasi:', err);
+      toast.error('Gagal menolak verifikasi');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleEscalate = async () => {
     if (!selectedId) return;
+    if (!auditNote.trim()) {
+      toast.error('Catatan wajib diisi untuk penolakan atau eskalasi.');
+      return;
+    }
+    if (!window.confirm('Yakin ingin mengeskalasi pengajuan ini ke tim legal?')) return;
+    setIsProcessing(true);
     try {
       const docRef = doc(db, 'profiles', selectedId);
-      await updateDoc(docRef, { 
+      await updateDoc(docRef, {
         verification_status: 'ESCALATED',
         audit_note: auditNote
       });
 
-      // Catat log
       await createAuditLog({
-        event: 'VERIFIKASI_ESKALASI',
+        event: 'DISTRIBUTOR_VERIFICATION_ESCALATED',
         status: 'WARNING',
         user: currentUser?.email || 'System Admin',
-        details: `Meneruskan verifikasi distributor ${selected?.company || ''} ke Tim Hukum dengan catatan: ${auditNote || 'Tidak ada catatan'}`
+        details: `Mengeskalasi verifikasi distributor ${selected?.company || ''} (ID: ${selectedId}) ke Tim Legal — Catatan: ${auditNote}`,
+        targetCollection: 'profiles',
+        targetId: selectedId
       });
 
-      alert('Kasus pendaftaran berhasil diteruskan ke Tim Hukum.');
+      toast.success('Kasus berhasil diteruskan ke Tim Legal.');
       setAuditNote('');
       setSelectedId(null);
       fetchApplications();
     } catch (err) {
-      console.error("Gagal meneruskan kasus ke Tim Hukum:", err);
+      console.error('Gagal meneruskan kasus ke Tim Legal:', err);
+      toast.error('Gagal meneruskan kasus ke Tim Legal');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -172,6 +212,7 @@ export const DistributorVerification = () => {
     switch (status) {
       case 'VERIFIED': return 'success';
       case 'PENDING_REVIEW': return 'warning';
+      case 'PENDING': return 'warning';
       case 'REJECTED': return 'danger';
       case 'ESCALATED': return 'info';
       default: return 'neutral';
@@ -182,200 +223,300 @@ export const DistributorVerification = () => {
     switch (status) {
       case 'VERIFIED': return 'Diverifikasi';
       case 'PENDING_REVIEW': return 'Menunggu Verifikasi';
+      case 'PENDING': return 'Menunggu Verifikasi';
       case 'REJECTED': return 'Ditolak';
       case 'ESCALATED': return 'Eskalasi Legal';
-      default: return status;
+      default: return status || '-';
+    }
+  };
+
+  const getDocStatusType = (status: string) => {
+    switch (status) {
+      case 'APPROVED': return 'success';
+      case 'PENDING': return 'warning';
+      case 'NEEDS_REVIEW': return 'warning';
+      case 'REJECTED': return 'danger';
+      case 'MISSING': return 'neutral';
+      default: return 'neutral';
+    }
+  };
+
+  const getDocStatusLabel = (status: string) => {
+    switch (status) {
+      case 'APPROVED': return 'Disetujui';
+      case 'PENDING': return 'Menunggu';
+      case 'NEEDS_REVIEW': return 'Perlu Review';
+      case 'REJECTED': return 'Ditolak';
+      case 'MISSING': return 'Belum Ada';
+      default: return 'Belum Ada';
     }
   };
 
   return (
-    <div className="space-y-12">
-      <div className="flex items-center justify-between">
-         <div className="space-y-1 border-l-4 border-amber-500 pl-8 py-2">
-            <h1 className="text-4xl font-black tracking-tighter">Verifikasi Distributor</h1>
-            <p className="text-muted-foreground font-medium">Tinjau dan validasi dokumen legal perusahaan distributor sebelum diaktifkan.</p>
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+         <div className="space-y-1 border-l-4 border-amber-500 pl-6 py-1">
+            <h1 className="text-3xl font-black tracking-tighter">Verifikasi Distributor</h1>
+            <p className="text-muted-foreground font-medium text-sm">Tinjau dan validasi dokumen legal perusahaan distributor sebelum diaktifkan.</p>
          </div>
-         <div className="flex items-center gap-4 bg-amber-500/10 px-6 py-3 rounded-2xl border border-amber-500/20">
-            <Clock className="text-amber-500" size={24} />
+         <div className="flex items-center gap-3 bg-amber-500/10 px-4 py-2 rounded-xl border border-amber-500/20 self-start sm:self-auto shrink-0">
+            <Clock className="text-amber-500 shrink-0" size={18} />
             <div>
-               <p className="text-xs font-black uppercase text-amber-500 tracking-widest">Rata-rata Peninjauan</p>
-               <p className="text-lg font-black italic">4.2 Jam</p>
+               <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest leading-none mb-0.5">Rata-rata Peninjauan</p>
+               <p className="text-sm font-black italic leading-none">4.2 Jam</p>
             </div>
          </div>
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-40 gap-4 text-muted-foreground bg-card border border-border/50 rounded-[3rem] shadow-xl">
-           <Loader2 className="animate-spin text-primary" size={48} />
+        <div className="flex flex-col items-center justify-center py-32 gap-4 text-muted-foreground bg-card border border-border/50 rounded-3xl shadow-xl">
+           <Loader2 className="animate-spin text-primary" size={40} />
            <p className="font-black text-xs uppercase tracking-widest">Sinkronisasi Berkas Pendaftaran...</p>
         </div>
       ) : (
-        <div className="grid lg:grid-cols-5 gap-12">
-          {/* List of Applications */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
+          {/* Left panel — fixed width on desktop */}
+          <div className="w-full lg:w-[360px] shrink-0 space-y-3">
+             {/* Search */}
              <div className="relative group">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Cari pengajuan distributor..." 
-                  className="w-full h-14 bg-card border border-border/50 rounded-2xl px-14 text-sm font-bold shadow-sm outline-none focus:border-primary/40 transition-all"
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                <input
+                  type="text"
+                  placeholder="Cari pengajuan distributor..."
+                  className="w-full h-11 bg-card border border-border/50 rounded-xl px-10 text-sm font-bold shadow-sm outline-none focus:border-primary/40 transition-all"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
              </div>
-             
-             <div className="space-y-4">
+
+             {/* Application list */}
+             <div className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-14rem)] pr-0.5 custom-scrollbar">
                 {filteredApplications.length === 0 ? (
-                  <p className="text-center py-10 font-bold text-muted-foreground text-sm">Tidak ada distributor yang menunggu verifikasi.</p>
+                  <div className="text-center py-8 px-4 bg-card border border-dashed border-border/50 rounded-2xl">
+                    <Building2 className="mx-auto text-muted-foreground/30 mb-3" size={28} />
+                    <p className="font-bold text-muted-foreground text-sm">
+                      {applications.length === 0
+                        ? 'Belum ada pengajuan verifikasi distributor.'
+                        : 'Tidak ada pengajuan yang sesuai pencarian.'}
+                    </p>
+                  </div>
                 ) : (
                   filteredApplications.map((app) => (
                     <motion.div
                       key={app.id}
                       onClick={() => setSelectedId(app.id)}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
                       className={cn(
-                        "p-8 bg-card border rounded-[2.5rem] cursor-pointer transition-all hover:scale-[1.02] shadow-xl relative overflow-hidden group",
-                        selectedId === app.id ? "border-primary ring-2 ring-primary/20" : "border-border/50 hover:border-primary/30"
+                        "p-4 bg-card border rounded-2xl cursor-pointer transition-all relative overflow-hidden group",
+                        selectedId === app.id
+                          ? "border-primary ring-2 ring-primary/20 shadow-lg"
+                          : "border-border/50 hover:border-primary/30 hover:shadow-md"
                       )}
                     >
-                       <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 bg-muted/40 rounded-xl flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-all">
-                             <Building2 size={24} />
+                       {/* Selected indicator bar */}
+                       {selectedId === app.id && <div className="absolute top-0 right-0 w-1 h-full bg-primary" />}
+
+                       <div className="flex items-center justify-between gap-3 mb-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                             <div className={cn(
+                               "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all",
+                               selectedId === app.id ? "bg-primary/20 text-primary" : "bg-muted/40 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                             )}>
+                                <Building2 size={16} />
+                             </div>
+                             <div className="min-w-0">
+                                <h4 className={cn(
+                                  "font-black text-sm tracking-tight leading-tight truncate transition-colors",
+                                  selectedId === app.id ? "text-primary" : "group-hover:text-primary"
+                                )}>{app.company}</h4>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{app.type}</p>
+                             </div>
                           </div>
-                          <StatusBadge 
-                            type={getStatusType(app.status)} 
-                            label={getStatusLabel(app.status)} 
+                          <StatusBadge
+                            type={getStatusType(app.status)}
+                            label={getStatusLabel(app.status)}
                           />
                        </div>
-                       <div className="space-y-1">
-                          <h4 className="font-black text-xl tracking-tight leading-tight">{app.company}</h4>
-                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{app.type}</p>
+
+                       <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground border-t border-border/30 pt-2.5">
+                          <Clock size={11} />
+                          <span>Terdaftar: {app.submitted}</span>
                        </div>
-                       <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/30 text-xs font-bold text-muted-foreground">
-                          <span className="flex items-center gap-2"><Clock size={14} /> Terdaftar: {app.submitted}</span>
-                          <ArrowRight size={16} className={cn("transition-transform", selectedId === app.id ? "translate-x-0" : "-translate-x-4 opacity-0")} />
-                       </div>
-                       {selectedId === app.id && <div className="absolute top-0 right-0 w-2 h-full bg-primary" />}
                     </motion.div>
                   ))
                 )}
              </div>
           </div>
 
-          {/* Details View */}
-          <div className="lg:col-span-3">
+          {/* Right panel — fluid */}
+          <div className="flex-1 min-w-0">
              <AnimatePresence mode="wait">
                 {selectedId ? (
                   <motion.div
                     key={selectedId}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="bg-card border border-border/50 rounded-[3rem] p-12 shadow-2xl space-y-10 sticky top-10"
+                    exit={{ opacity: 0, y: -16 }}
+                    className="bg-card border border-border/50 rounded-3xl shadow-2xl overflow-hidden"
                   >
-                     <div className="flex justify-between items-start">
-                        <div className="space-y-3">
-                           <div className="flex items-center gap-4 flex-wrap">
-                              <h2 className="text-3xl sm:text-4xl font-black tracking-tighter">{selected?.company}</h2>
-                              {selected?.is_verified && <ShieldCheck className="text-primary shrink-0" size={32} />}
+                     {/* Distributor header */}
+                     <div className="px-6 md:px-8 pt-6 md:pt-8 pb-4 border-b border-border/40">
+                        <div className="flex items-start gap-4">
+                           <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                              <Building2 size={22} />
                            </div>
-                           <div className="flex flex-wrap items-center gap-6 text-muted-foreground font-bold text-sm">
-                              <span className="flex items-center gap-2"><MapPin size={18} /> {selected?.location}</span>
-                              <span className="flex items-center gap-2"><Clock size={18} /> ID: VERIF-{selected?.id}</span>
-                           </div>
-                        </div>
-                        <div className="flex gap-3">
-                           <Button 
-                             variant="outline" 
-                             className="h-12 w-12 rounded-xl text-rose-500 hover:bg-rose-500/10 border-border p-0"
-                             onClick={handleReject}
-                             title="Tolak Pendaftaran"
-                           >
-                              <XCircle size={24} />
-                           </Button>
-                           <Button 
-                             className="h-12 w-12 rounded-xl bg-primary text-primary-foreground p-0"
-                             onClick={handleApprove}
-                             title="Setujui Pendaftaran"
-                           >
-                              <CheckCircle2 size={24} />
-                           </Button>
-                        </div>
-                     </div>
-
-                     <div className="grid md:grid-cols-2 gap-8">
-                        <div className="bg-muted/20 p-8 rounded-[2rem] border border-border/30 space-y-6">
-                           <h3 className="text-lg font-black flex items-center gap-3">
-                              <FileText className="text-primary" size={20} />
-                              Checklist Dokumen NIB/NPWP
-                           </h3>
-                           <div className="space-y-4">
-                              {selected?.documents.map((docItem: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-border/30 group cursor-pointer hover:border-primary/40">
-                                   <span className="text-xs font-bold text-muted-foreground">{docItem.name}</span>
-                                   <div className="flex items-center gap-3">
-                                      <StatusBadge type={docItem.status === 'TAMPILKAN' ? 'success' : 'warning'} label={docItem.status} />
-                                      <ExternalLink size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                                   </div>
-                                </div>
-                              ))}
-                           </div>
-                        </div>
-
-                        <div className="bg-[#1B2632] p-8 rounded-[2rem] text-[#EEE9DF] space-y-6">
-                           <h3 className="text-lg font-black flex items-center gap-3 text-primary">
-                              <ShieldCheck size={20} />
-                              Penilaian Lencana
-                           </h3>
-                           <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-4">
-                              <p className="text-xs font-black uppercase text-white/40 tracking-widest">Lencana yang Diminta:</p>
-                              <div className="flex items-center gap-4">
-                                 <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
-                                    <ShieldCheck size={24} />
-                                 </div>
-                                 <span className="text-lg font-black italic">{selected?.requestedBadge}</span>
+                           <div className="space-y-1.5 min-w-0 flex-1">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                 <h2 className="text-lg font-black tracking-tight leading-tight">{selected?.company}</h2>
+                                 {selected?.is_verified && <ShieldCheck className="text-primary shrink-0" size={16} />}
+                                 <StatusBadge
+                                   type={getStatusType(selected?.status || '')}
+                                   label={getStatusLabel(selected?.status || '')}
+                                 />
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground font-medium text-xs">
+                                 <span className="flex items-center gap-1.5"><MapPin size={12} /> {selected?.location || 'Lokasi tidak tersedia'}</span>
+                                 <span className="flex items-center gap-1.5"><Clock size={12} /> Terdaftar: {selected?.submitted || '-'}</span>
+                                 <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide">ID: {selected?.id?.slice(0, 12)}</span>
                               </div>
                            </div>
                         </div>
                      </div>
 
-                     <div className="space-y-6">
-                        <h3 className="text-xl font-black tracking-tight flex items-center gap-3">
-                           <History className="text-primary" />
-                           Catatan Audit Internal (Alasan Penolakan/Catatan Khusus)
+                     {/* Document checklist */}
+                     <div className="px-6 md:px-8 pt-5 pb-4 space-y-3">
+                        <h3 className="text-sm font-black flex items-center gap-2">
+                           <FileText className="text-primary" size={15} />
+                           Dokumen Legal
                         </h3>
-                        <textarea 
-                          placeholder="Tuliskan catatan persetujuan atau alasan detail penolakan (wajib jika menolak)..." 
-                          className="w-full h-32 bg-muted/20 border border-border/50 rounded-2xl p-6 text-sm font-medium outline-none focus:border-primary/40 transition-all resize-none"
-                          value={auditNote}
-                          onChange={(e) => setAuditNote(e.target.value)}
-                        />
+                        <div className="space-y-2">
+                           {(!selected?.documents || selected.documents.length === 0) ? (
+                             <p className="text-xs text-muted-foreground font-medium py-3 px-4 bg-muted/20 rounded-xl border border-border/30">
+                               Dokumen belum tersedia.
+                             </p>
+                           ) : (
+                             selected.documents.map((docItem: any, i: number) => (
+                               <div key={i} className="flex items-center justify-between p-3 bg-muted/20 rounded-xl border border-border/30 transition-colors hover:border-border/60">
+                                  <span className="text-xs font-bold text-foreground/80 truncate pr-2">{docItem.name}</span>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                     <StatusBadge
+                                       type={getDocStatusType(docItem.status)}
+                                       label={getDocStatusLabel(docItem.status)}
+                                     />
+                                     {docItem.url ? (
+                                       <a
+                                         href={docItem.url}
+                                         target="_blank"
+                                         rel="noopener noreferrer"
+                                         className="text-muted-foreground hover:text-primary transition-colors"
+                                         title="Lihat dokumen"
+                                       >
+                                         <ExternalLink size={13} />
+                                       </a>
+                                     ) : (
+                                       <ExternalLink size={13} className="text-muted-foreground/20" />
+                                     )}
+                                  </div>
+                               </div>
+                             ))
+                           )}
+                        </div>
                      </div>
 
-                     <div className="flex flex-col sm:flex-row gap-4">
-                        <Button 
-                          className="flex-1 h-16 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/30 flex gap-4 items-center justify-center"
-                          onClick={handleApprove}
-                        >
-                           Setujui Verifikasi
-                           <ShieldCheck size={24} />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="h-16 px-10 rounded-2xl border-border bg-card font-black text-lg text-amber-500 hover:bg-amber-500/10"
-                          onClick={handleEscalate}
-                        >
-                           Eskalasi ke Legal
-                        </Button>
+                     {/* Package/badge assessment */}
+                     <div className="px-6 md:px-8 bg-muted/30 mx-0 border-y border-border/30 py-4 space-y-2.5">
+                        <h3 className="text-sm font-black flex items-center gap-2">
+                           <ShieldCheck className="text-primary" size={15} />
+                           Penilaian Paket Distributor
+                        </h3>
+                        {selected?.requestedBadge ? (
+                          <div className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border/40">
+                             <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary shrink-0">
+                                <ShieldCheck size={16} />
+                             </div>
+                             <div>
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-0.5">Paket/Lencana yang Diajukan</p>
+                                <span className="text-sm font-black">{selected.requestedBadge}</span>
+                             </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground font-medium py-2 px-3 bg-card rounded-xl border border-border/30">
+                            Tidak ada paket yang diajukan.
+                          </p>
+                        )}
+                     </div>
+
+                     {/* Decision area: audit notes + actions */}
+                     <div className="px-6 md:px-8 pb-6 md:pb-8 pt-4 space-y-4 border-t border-border/40 bg-muted/10">
+                        {/* Internal audit notes */}
+                        <div className="space-y-2">
+                           <div className="flex items-center gap-2">
+                              <History className="text-primary shrink-0" size={14} />
+                              <h3 className="text-sm font-black">Catatan Audit Internal</h3>
+                           </div>
+                           <textarea
+                             placeholder="Tuliskan catatan persetujuan atau alasan detail penolakan..."
+                             className="w-full min-h-[80px] bg-background border border-border/50 rounded-xl p-3.5 text-sm font-medium outline-none focus:border-primary/40 transition-all resize-y"
+                             value={auditNote}
+                             onChange={(e) => setAuditNote(e.target.value)}
+                             disabled={isProcessing}
+                           />
+                           <p className="text-[11px] text-muted-foreground font-medium">
+                             Wajib diisi jika pengajuan ditolak atau dieskalasi.
+                           </p>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex flex-col sm:flex-row gap-2.5">
+                           <Button
+                             className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/20 flex gap-2 items-center justify-center disabled:opacity-60"
+                             onClick={handleApprove}
+                             disabled={isProcessing || isLoading || selected?.is_verified}
+                             title={selected?.is_verified ? 'Distributor sudah terverifikasi' : 'Setujui verifikasi'}
+                           >
+                              {isProcessing ? (
+                                <>Memproses... <Loader2 className="animate-spin" size={16} /></>
+                              ) : (
+                                <><CheckCircle2 size={16} /> Setujui Verifikasi</>
+                              )}
+                           </Button>
+                           <Button
+                             variant="outline"
+                             className="h-11 px-5 rounded-xl border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-black text-sm flex gap-2 items-center justify-center disabled:opacity-60"
+                             onClick={handleReject}
+                             disabled={isProcessing || isLoading}
+                           >
+                              {isProcessing ? (
+                                <>Memproses... <Loader2 className="animate-spin text-rose-500" size={16} /></>
+                              ) : (
+                                <><XCircle size={16} /> Tolak Pengajuan</>
+                              )}
+                           </Button>
+                           <Button
+                             variant="outline"
+                             className="h-11 px-5 rounded-xl border-amber-500/30 text-amber-500 hover:bg-amber-500/10 font-black text-sm flex gap-2 items-center justify-center disabled:opacity-60"
+                             onClick={handleEscalate}
+                             disabled={isProcessing || isLoading}
+                           >
+                              {isProcessing ? (
+                                <>Memproses... <Loader2 className="animate-spin text-amber-500" size={16} /></>
+                              ) : (
+                                <><Gavel size={16} /> Eskalasi Legal</>
+                              )}
+                           </Button>
+                        </div>
                      </div>
                   </motion.div>
                 ) : (
-                  <div className="h-[600px] flex flex-col items-center justify-center text-center space-y-6 bg-muted/10 border border-dashed border-border/50 rounded-[3rem] p-6">
-                     <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center text-muted-foreground opacity-20">
-                        <Scale size={48} />
+                  <div className="min-h-[320px] flex flex-col items-center justify-center text-center space-y-3 bg-muted/10 border border-dashed border-border/50 rounded-3xl p-8">
+                     <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground opacity-20">
+                        <Scale size={24} />
                      </div>
-                     <div className="space-y-2">
-                        <h3 className="text-2xl font-black italic">Tinjauan Hukum</h3>
-                        <p className="text-muted-foreground font-medium max-w-sm">Pilih salah satu pengajuan distributor dari panel kiri untuk meninjau kecocokan dokumen NIB/NPWP serta profil perusahaan.</p>
+                     <div className="space-y-1">
+                        <h3 className="text-base font-black">Pilih Pengajuan</h3>
+                        <p className="text-muted-foreground font-medium max-w-xs text-sm">Pilih pengajuan distributor untuk ditinjau.</p>
                      </div>
                   </div>
                 )}

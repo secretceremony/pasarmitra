@@ -74,7 +74,7 @@ const ADMIN_NAV_ITEMS = [
   { label: 'Admin Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
-  { label: 'Moderation', href: '/admin/moderation', icon: Box },
+  { label: 'Moderasi Produk', href: '/admin/moderation', icon: Box },
   { label: 'Finances', href: '/admin/finances', icon: Wallet },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
   { label: 'Disputes', href: '/admin/disputes', icon: Handshake },
@@ -101,7 +101,7 @@ export const MainLayout = () => {
   else if (isDistributor) navItems = DISTRIBUTOR_NAV_ITEMS;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans text-foreground overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans text-foreground overflow-x-hidden">
       {/* Sidebar - Left */}
       <motion.aside
         initial={false}
@@ -164,7 +164,7 @@ export const MainLayout = () => {
       </motion.aside>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen relative bg-background">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen relative bg-background">
         {/* Top Navbar */}
         <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-2xl border-b border-border px-4 md:px-8 py-4 flex items-center gap-3 md:gap-12 h-20 md:h-24">
           <button className="md:hidden p-2 text-foreground bg-card rounded-xl border border-border" onClick={() => setMobileMenuOpen(true)}>
@@ -176,7 +176,7 @@ export const MainLayout = () => {
                 <Search className="absolute left-3.5 md:left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors w-4 h-4 md:w-5 md:h-5" />
                 <input 
                   type="text" 
-                  placeholder="Search products, distributors or brands..." 
+                  placeholder={isAdmin ? "Cari pengguna, distributor, produk, invoice, atau transaksi..." : "Search products, distributors or brands..."} 
                   className="w-full bg-card/60 border border-border/50 focus:border-primary/40 focus:bg-card pl-10 pr-4 md:px-14 py-2.5 md:py-4 rounded-2xl md:rounded-3xl text-xs md:text-sm transition-all focus:outline-none shadow-sm font-bold tracking-tight h-10 md:h-14"
                 />
              </div>
@@ -254,7 +254,7 @@ export const MainLayout = () => {
         </header>
 
         {/* Content Wrapper */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex">
           <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-12 scroll-smooth">
             <Outlet />
           </main>

@@ -29,6 +29,7 @@ import { StatusBadge } from '../../../components/common/StatusBadge';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../services/adminService';
 import { cn } from '../../../lib/utils';
+import { toast } from 'sonner';
 
 const DEFAULT_DISPUTES = [
   {
@@ -69,6 +70,7 @@ export const DisputeManagement = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { user: currentUser } = useAuthStore();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchDisputes = async () => {
     try {
@@ -100,6 +102,8 @@ export const DisputeManagement = () => {
   }, []);
 
   const handleRefund = async (disputeId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menyetujui pengembalian dana untuk sengketa ini?')) return;
+    setIsProcessing(true);
     try {
       const dispute = disputes.find(d => d.id === disputeId);
       if (!dispute) return;
@@ -116,14 +120,19 @@ export const DisputeManagement = () => {
         details: `Menyetujui pengembalian dana sengketa ${disputeId} senilai ${dispute.amount} untuk ${dispute.claimant}`
       });
 
-      alert('Kasus diselesaikan: Pengembalian dana disetujui.');
+      toast.success('Kasus diselesaikan: Pengembalian dana disetujui.');
       fetchDisputes();
     } catch (err) {
       console.error("Gagal memproses pengembalian dana:", err);
+      toast.error('Gagal memproses pengembalian dana');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleRejectClaim = async (disputeId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menolak klaim sengketa ini?')) return;
+    setIsProcessing(true);
     try {
       const dispute = disputes.find(d => d.id === disputeId);
       if (!dispute) return;
@@ -140,14 +149,19 @@ export const DisputeManagement = () => {
         details: `Menolak klaim sengketa ${disputeId} yang diajukan oleh ${dispute.claimant}`
       });
 
-      alert('Kasus diselesaikan: Klaim sengketa ditolak.');
+      toast.success('Kasus diselesaikan: Klaim sengketa ditolak.');
       fetchDisputes();
     } catch (err) {
       console.error("Gagal menolak klaim sengketa:", err);
+      toast.error('Gagal menolak klaim sengketa');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleTransferToMediator = async (disputeId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin mentransfer sengketa ini ke mediator internal?')) return;
+    setIsProcessing(true);
     try {
       const dispute = disputes.find(d => d.id === disputeId);
       if (!dispute) return;
@@ -164,10 +178,13 @@ export const DisputeManagement = () => {
         details: `Mentransfer sengketa ${disputeId} ke Mediator Internal`
       });
 
-      alert('Kasus ditransfer ke mediator internal.');
+      toast.success('Kasus ditransfer ke mediator internal.');
       fetchDisputes();
     } catch (err) {
       console.error("Gagal mentransfer sengketa:", err);
+      toast.error('Gagal mentransfer sengketa');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -358,25 +375,32 @@ export const DisputeManagement = () => {
                           <div className="grid md:grid-cols-2 gap-6">
                              <Button 
                                onClick={() => handleRefund(selected.id)}
-                               className="h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg shadow-xl shadow-emerald-500/20 flex gap-3 cursor-pointer"
+                               className="h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg shadow-xl shadow-emerald-500/20 flex gap-3 cursor-pointer items-center justify-center"
+                               disabled={isProcessing}
                              >
-                                <CheckCircle2 size={24} />
+                                {isProcessing ? <Loader2 className="animate-spin text-white" size={24} /> : <CheckCircle2 size={24} />}
                                 Setujui Pengembalian
                              </Button>
                              <Button 
                                onClick={() => handleRejectClaim(selected.id)}
-                               className="h-16 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-lg shadow-xl shadow-rose-500/20 flex gap-3 cursor-pointer"
+                               className="h-16 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-lg shadow-xl shadow-rose-500/20 flex gap-3 cursor-pointer items-center justify-center"
+                               disabled={isProcessing}
                              >
-                                <XCircle size={24} />
+                                {isProcessing ? <Loader2 className="animate-spin text-white" size={24} /> : <XCircle size={24} />}
                                 Tolak Klaim
                              </Button>
                           </div>
                           <Button 
                             onClick={() => handleTransferToMediator(selected.id)}
                             variant="outline" 
-                            className="w-full h-14 rounded-2xl border-border bg-card font-black uppercase text-xs tracking-widest flex gap-3 hover:bg-muted/50 transition-all cursor-pointer"
+                            className="w-full h-14 rounded-2xl border-border bg-card font-black uppercase text-xs tracking-widest flex gap-3 hover:bg-muted/50 transition-all cursor-pointer items-center justify-center"
+                            disabled={isProcessing}
                           >
-                             <MessageSquareText size={18} />
+                             {isProcessing ? (
+                               <Loader2 className="animate-spin text-muted-foreground" size={18} />
+                             ) : (
+                               <MessageSquareText size={18} />
+                             )}
                              Transfer ke Mediator Internal
                           </Button>
                        </div>

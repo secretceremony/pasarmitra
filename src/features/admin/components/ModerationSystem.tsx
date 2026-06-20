@@ -21,52 +21,16 @@ import {
   List,
   Loader2
 } from 'lucide-react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../services/adminService';
 import { cn } from '../../../lib/utils';
+import { toast } from 'sonner';
 
-const DEFAULT_MODERATION_ITEMS = [
-  { 
-    id: 'mod-1', 
-    type: 'PRODUCT', 
-    title: 'Minyak Goreng Sawit 2L', 
-    author: 'Toko Sembako Jaya', 
-    reason: 'Harga Mencurigakan (Terlalu Rendah)', 
-    severity: 'MEDIUM',
-    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=500&auto=format&fit=crop&q=60',
-    timestamp: '10 menit yang lalu',
-    status: 'PENDING_MODERATION',
-    content: ''
-  },
-  { 
-    id: 'mod-2', 
-    type: 'REVIEW', 
-    title: 'Ulasan untuk PT. Indofood', 
-    author: 'Mitra_UMKM_Jaya', 
-    reason: 'Kata-kata Kasar/Tidak Pantas', 
-    severity: 'HIGH',
-    content: 'Distributor ini sangat buruk, mereka tidak pernah mengirim tepat waktu dan stafnya sangat kasar...',
-    timestamp: '45 menit yang lalu',
-    status: 'PENDING_MODERATION',
-    image: ''
-  },
-  { 
-    id: 'mod-3', 
-    type: 'PRODUCT', 
-    title: 'Suplemen Farmasi Grosir', 
-    author: 'Medika Global', 
-    reason: 'Kategori Barang Dibatasi', 
-    severity: 'HIGH',
-    image: 'https://images.unsplash.com/photo-1587854680352-936b22b91030?w=500&auto=format&fit=crop&q=60',
-    timestamp: '2 jam yang lalu',
-    status: 'PENDING_MODERATION',
-    content: ''
-  },
-];
+
 
 export const ModerationSystem = () => {
   const [items, setItems] = useState<any[]>([]);
@@ -80,23 +44,14 @@ export const ModerationSystem = () => {
     try {
       setIsLoading(true);
       const qSnap = await getDocs(collection(db, 'moderation_items'));
-      if (qSnap.empty) {
-        // Inisialisasi data contoh ke Firestore
-        const list: any[] = [];
-        for (const item of DEFAULT_MODERATION_ITEMS) {
-          await setDoc(doc(db, 'moderation_items', item.id), item);
-          list.push(item);
-        }
-        setItems(list);
-      } else {
-        const list: any[] = [];
-        qSnap.forEach(d => {
-          list.push({ id: d.id, ...d.data() });
-        });
-        setItems(list);
-      }
+      const list: any[] = [];
+      qSnap.forEach(d => {
+        list.push({ id: d.id, ...d.data() });
+      });
+      setItems(list);
     } catch (err) {
-      console.error("Gagal memuat item moderasi:", err);
+      console.error('Gagal memuat item moderasi:', err);
+      toast.error('Gagal memuat data moderasi');
     } finally {
       setIsLoading(false);
     }
@@ -106,97 +61,153 @@ export const ModerationSystem = () => {
     fetchModerationItems();
   }, []);
 
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const handleApprove = async (itemId: string) => {
+    setActionInProgress(itemId);
     try {
       const item = items.find(i => i.id === itemId);
       const docRef = doc(db, 'moderation_items', itemId);
-      
-      // Approve menyetel status menjadi ACTIVE (bersih/lolos moderasi)
-      await updateDoc(docRef, { status: 'ACTIVE' });
-      
-      setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: 'ACTIVE' } : i));
 
-      // Catat log audit
-      await createAuditLog({
-        event: 'MODERASI_SETUJU',
-        status: 'SUCCESS',
-        user: currentUser?.email || 'System Admin',
-        details: `Menyetujui konten ${item?.type} "${item?.title || ''}" (Lolos Moderasi)`
+      // Approve: set status to approved and add resolver fields
+      await updateDoc(docRef, {
+        status: 'approved',
+        resolvedAt: new Date(),
+        resolvedBy: currentUser?.email || currentUser?.id || 'System Admin',
       });
 
-      alert('Konten disetujui dan dinyatakan bersih.');
-      fetchModerationItems();
+      setItems(prev =>
+        prev.map(i =>
+          i.id === itemId ? { ...i, status: 'approved', resolvedAt: new Date(), resolvedBy: currentUser?.email || currentUser?.id || 'System Admin' } : i
+        )
+      );
+
+      // Audit log
+      await createAuditLog({
+        event: 'MODERATION_APPROVED_SAFE',
+        status: 'SUCCESS',
+        user: currentUser?.email || currentUser?.id || 'System Admin',
+        details: `Menyetujui laporan ${item?.targetType ?? item?.type} ID ${item?.targetId ?? item?.id}`,
+        targetCollection: 'moderation_items',
+        targetId: itemId,
+      });
+
+      toast.success('Laporan disetujui.');
     } catch (err) {
-      console.error("Gagal menyetujui konten:", err);
+      console.error('Gagal menyetujui laporan:', err);
+      toast.error('Gagal menyetujui laporan');
+    } finally {
+      setActionInProgress(null);
+      fetchModerationItems();
     }
   };
 
   const handleReject = async (itemId: string) => {
+    setActionInProgress(itemId);
     try {
       const item = items.find(i => i.id === itemId);
       const docRef = doc(db, 'moderation_items', itemId);
-      
-      // Reject menyetel status menjadi BLOCKED / INACTIVE (diblokir sesuai A5)
-      await updateDoc(docRef, { status: 'BLOCKED' });
-      
-      setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: 'BLOCKED' } : i));
 
-      // Catat log audit
-      await createAuditLog({
-        event: 'MODERASI_TOLAK',
-        status: 'BLOCK',
-        user: currentUser?.email || 'System Admin',
-        details: `Memblokir konten ${item?.type} "${item?.title || ''}" karena melanggar aturan`
+      // Update moderation report status to rejected with resolver fields
+      await updateDoc(docRef, {
+        status: 'rejected',
+        resolvedAt: new Date(),
+        resolvedBy: currentUser?.email || currentUser?.id || 'System Admin',
       });
 
-      alert('Konten berhasil diblokir (status tidak aktif).');
-      fetchModerationItems();
+      // Deactivate product or hide review based on targetType
+      if (item?.targetType?.toUpperCase() === 'PRODUCT' || item?.type?.toUpperCase() === 'PRODUCT') {
+        const productId = item?.targetId ?? item?.id;
+        const prodRef = doc(db, 'products', productId);
+        await updateDoc(prodRef, { is_active: false });
+      } else if (item?.targetType?.toUpperCase() === 'REVIEW' || item?.type?.toUpperCase() === 'REVIEW') {
+        const reviewId = item?.targetId ?? item?.id;
+        const revRef = doc(db, 'reviews', reviewId);
+        await updateDoc(revRef, { is_hidden: true });
+      }
+
+      setItems(prev =>
+        prev.map(i =>
+          i.id === itemId ? { ...i, status: 'rejected', resolvedAt: new Date(), resolvedBy: currentUser?.email || currentUser?.id || 'System Admin' } : i
+        )
+      );
+
+      // Audit log
+      await createAuditLog({
+        event: 'MODERATION_CONTENT_BLOCKED',
+        status: 'BLOCK',
+        user: currentUser?.email || currentUser?.id || 'System Admin',
+        details: `Menolak laporan ${item?.targetType ?? item?.type} ID ${item?.targetId ?? item?.id}`,
+        targetCollection: 'moderation_items',
+        targetId: itemId,
+      });
+
+      toast.error('Laporan ditolak dan konten disembunyikan.');
     } catch (err) {
-      console.error("Gagal menolak/memblokir konten:", err);
+      console.error('Gagal menolak laporan:', err);
+      toast.error('Gagal menolak laporan');
+    } finally {
+      setActionInProgress(null);
+      fetchModerationItems();
     }
   };
 
   const handleDelete = async (itemId: string) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus laporan moderasi ini secara permanen?')) return;
+    if (!window.confirm('Apakah Anda yakin ingin mengarsipkan laporan moderasi ini?')) return;
+    setActionInProgress(itemId);
     try {
       const item = items.find(i => i.id === itemId);
-      await deleteDoc(doc(db, 'moderation_items', itemId));
-      
-      setItems(prev => prev.filter(i => i.id !== itemId));
-
-      // Catat log audit
-      await createAuditLog({
-        event: 'MODERASI_HAPUS',
-        status: 'WARNING',
-        user: currentUser?.email || 'System Admin',
-        details: `Menghapus laporan moderasi untuk ${item?.type} "${item?.title || ''}"`
+      // Soft delete: update status to 'deleted' and record deletion metadata
+      await updateDoc(doc(db, 'moderation_items', itemId), {
+        status: 'deleted',
+        deletedAt: new Date(),
+        deletedBy: currentUser?.email || currentUser?.id || 'System Admin',
       });
 
-      alert('Laporan moderasi dihapus.');
+      // Remove from local list
+      setItems(prev => prev.filter(i => i.id !== itemId));
+
+      // Audit log
+      await createAuditLog({
+        event: 'MODERATION_DELETED',
+        status: 'WARNING',
+        user: currentUser?.email || currentUser?.id || 'System Admin',
+        details: `Mengarsipkan laporan moderasi ID ${itemId}`,
+        targetCollection: 'moderation_items',
+        targetId: itemId,
+      });
+
+      toast.success('Laporan moderasi diarsipkan.');
     } catch (err) {
-      console.error("Gagal menghapus laporan moderasi:", err);
+      console.error('Gagal mengarsipkan laporan moderasi:', err);
+      toast.error('Gagal mengarsipkan laporan moderasi');
+    } finally {
+      setActionInProgress(null);
+      fetchModerationItems();
     }
   };
 
   const filteredItems = items
     .filter(item => {
       // Filter tab
-      if (activeTab === 'PRODUCTS') return item.type === 'PRODUCT';
-      if (activeTab === 'REVIEWS') return item.type === 'REVIEW';
+      if (activeTab === 'PRODUCTS') return (item.targetType ?? item.type) === 'PRODUCT';
+      if (activeTab === 'REVIEWS') return (item.targetType ?? item.type) === 'REVIEW';
       return true;
     })
     .filter(item => {
-      // Hanya tampilkan yang statusnya PENDING_MODERATION agar admin memoderasi item baru
-      return item.status === 'PENDING_MODERATION';
+      // Show only pending reports
+      return (item.status ?? '').toLowerCase() === 'pending';
     })
     .filter(item => {
-      // Pencarian kata kunci
+      // Search keyword
       const term = search.toLowerCase();
       return (
-        item.title.toLowerCase().includes(term) ||
-        item.author.toLowerCase().includes(term) ||
-        item.reason.toLowerCase().includes(term) ||
-        (item.content || '').toLowerCase().includes(term)
+        (item.title && item.title.toLowerCase().includes(term)) ||
+        (item.author && item.author.toLowerCase().includes(term)) ||
+        (item.reason && item.reason.toLowerCase().includes(term)) ||
+        (item.content && item.content.toLowerCase().includes(term)) ||
+        (item.targetId && item.targetId.toString().toLowerCase().includes(term))
       );
     });
 
@@ -204,8 +215,8 @@ export const ModerationSystem = () => {
     <div className="space-y-12">
       <div className="flex items-center justify-between flex-wrap gap-6">
          <div className="space-y-1 border-l-4 border-rose-500 pl-8 py-2">
-            <h1 className="text-4xl font-black tracking-tighter">Sistem Moderasi</h1>
-            <p className="text-muted-foreground font-medium">Jaga integritas ekosistem dengan memfilter produk mencurigakan dan ulasan negatif.</p>
+            <h1 className="text-4xl font-black tracking-tighter">Moderasi Produk</h1>
+            <p className="text-muted-foreground font-medium">Persetujuan produk baru distributor dan pengelolaan ulasan produk marketplace.</p>
          </div>
          <div className="flex bg-muted p-1 rounded-2xl border border-border shadow-inner">
             <Button 
@@ -249,6 +260,11 @@ export const ModerationSystem = () => {
         <div className="flex flex-col items-center justify-center py-40 gap-4 text-muted-foreground bg-card border border-border/50 rounded-[3rem] shadow-xl">
            <Loader2 className="animate-spin text-primary" size={48} />
            <p className="font-black text-xs uppercase tracking-widest">Sinkronisasi Database Moderasi...</p>
+        </div>
+      ) : error ? (
+        <div className="h-[300px] flex flex-col items-center justify-center text-center space-y-4 bg-rose-50 border border-dashed border-rose-200 rounded-[3rem] p-6">
+           <p className="text-rose-600 font-black text-lg">{error}</p>
+           <Button variant="outline" onClick={fetchModerationItems}>Coba Lagi</Button>
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="h-[300px] flex flex-col items-center justify-center text-center space-y-4 bg-muted/10 border border-dashed border-border/50 rounded-[3rem] p-6">
@@ -318,25 +334,41 @@ export const ModerationSystem = () => {
                            className="h-12 w-12 rounded-xl text-emerald-500 hover:bg-emerald-500/10 transition-all p-0 flex items-center justify-center"
                            onClick={() => handleApprove(item.id)}
                            title="Setujui Konten"
+                           disabled={actionInProgress !== null}
                          >
-                            <CheckCircle2 size={24} />
+                            {actionInProgress === item.id ? (
+                               <Loader2 size={24} className="animate-spin text-emerald-500" />
+                             ) : (
+                               <CheckCircle2 size={24} />
+                             )}
                          </Button>
                          <Button 
                            variant="outline" 
                            className="h-12 w-12 rounded-xl text-rose-500 hover:bg-rose-500/10 transition-all p-0 flex items-center justify-center"
                            onClick={() => handleReject(item.id)}
                            title="Blokir Konten"
+                           disabled={actionInProgress !== null}
                          >
-                            <XCircle size={24} />
+                            {actionInProgress === item.id ? (
+                               <Loader2 size={24} className="animate-spin text-rose-500" />
+                             ) : (
+                               <XCircle size={24} />
+                             )}
                          </Button>
                       </div>
                       <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                          <Button 
                            variant="ghost" 
-                           className="h-12 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest text-rose-500 flex gap-2"
+                           className="h-12 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest text-rose-500 flex gap-2 items-center"
                            onClick={() => handleDelete(item.id)}
+                           disabled={actionInProgress !== null}
                          >
-                            Hapus Laporan <Trash2 size={16} />
+                            {actionInProgress === item.id ? (
+                               <Loader2 size={16} className="animate-spin text-rose-500 mr-2" />
+                             ) : (
+                               <Trash2 size={16} className="mr-2" />
+                             )}
+                            Hapus Laporan
                          </Button>
                       </div>
                    </div>

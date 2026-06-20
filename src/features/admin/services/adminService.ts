@@ -7,6 +7,8 @@ export interface AuditLogData {
   user: string;
   details: string;
   ip?: string;
+  targetCollection?: string;
+  targetId?: string;
 }
 
 export const createAuditLog = async (logData: Omit<AuditLogData, 'ip'>) => {

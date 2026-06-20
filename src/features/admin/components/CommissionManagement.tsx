@@ -19,21 +19,29 @@ import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../services/adminService';
+import { toast } from 'sonner';
 
 export const CommissionManagement = () => {
   const [tiers, setTiers] = useState<any[]>([]);
   const [globalBaseline, setGlobalBaseline] = useState<number>(1.375);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingTierId, setEditingTierId] = useState<string | null>(null);
   const [editRate, setEditRate] = useState<string>('');
   const [search, setSearch] = useState('');
   const { user: currentUser } = useAuthStore();
 
+  const DEFAULT_FEES = {
+    DISTRIBUTOR: 1.5,
+    "Strategic Enterprise": 1.0,
+    "Local Farmers": 0.5,
+    "Sembako Wholesale": 1.25
+  };
+
   const fetchCommissionData = async () => {
     try {
       setIsLoading(true);
       
-      // Ambil global baseline dari settings/commission
       const globalDoc = await getDoc(doc(db, 'settings', 'commission'));
       if (globalDoc.exists()) {
         setGlobalBaseline(globalDoc.data().globalBaseline || 1.375);
@@ -41,7 +49,6 @@ export const CommissionManagement = () => {
         await setDoc(doc(db, 'settings', 'commission'), { globalBaseline: 1.375 });
       }
 
-      // Ambil tiers dari commission_tiers
       const qSnap = await getDocs(collection(db, 'commission_tiers'));
       const list: any[] = [];
       qSnap.forEach(d => {
@@ -51,17 +58,32 @@ export const CommissionManagement = () => {
           name: data.name || '',
           partnerType: data.partnerType || 'DISTRIBUTOR',
           partnersActive: data.partnersActive || 0,
-          platformFee: data.platformFee || 0,
+          platformFee: typeof data.platformFee === 'number' ? data.platformFee : (DEFAULT_FEES[data.partnerType as keyof typeof DEFAULT_FEES] ?? 0),
           description: data.description || '',
           isActive: data.isActive !== undefined ? data.isActive : true,
           updatedAt: data.updatedAt || null
         });
       });
-      // Urutkan berdasarkan ID
-      list.sort((a, b) => a.id.localeCompare(b.id));
-      setTiers(list);
+
+      if (list.length === 0) {
+        const fallback = Object.entries(DEFAULT_FEES).map(([partner, fee]) => ({
+          id: `${partner}-fallback`,
+          name: partner,
+          partnerType: partner,
+          partnersActive: 0,
+          platformFee: fee,
+          description: '',
+          isActive: true,
+          updatedAt: null
+        }));
+        setTiers(fallback);
+      } else {
+        list.sort((a, b) => a.id.localeCompare(b.id));
+        setTiers(list);
+      }
     } catch (err) {
       console.error("Gagal memuat pengaturan komisi:", err);
+      toast.error('Gagal memuat data komisi');
     } finally {
       setIsLoading(false);
     }
@@ -78,8 +100,12 @@ export const CommissionManagement = () => {
 
   const handleSaveRate = async (tierId: string) => {
     const rateNum = parseFloat(editRate);
-    if (isNaN(rateNum) || rateNum < 0) {
-      alert('Platform Fee tidak boleh bernilai negatif.');
+    if (!editRate.trim() || isNaN(rateNum)) {
+      toast.error('Platform Fee harus berupa angka.');
+      return;
+    }
+    if (rateNum < 0) {
+      toast.error('Platform Fee tidak boleh bernilai negatif.');
       return;
     }
     if (rateNum > 10.0) {
@@ -87,6 +113,7 @@ export const CommissionManagement = () => {
       if (!confirmAboveTen) return;
     }
 
+    setIsSaving(true);
     try {
       const tier = tiers.find(t => t.id === tierId);
       const oldRate = tier?.platformFee;
@@ -97,112 +124,25 @@ export const CommissionManagement = () => {
         updatedAt: new Date()
       });
       
-      // Update state lokal
       setTiers(prev => prev.map(t => t.id === tierId ? { ...t, platformFee: rateNum } : t));
       setEditingTierId(null);
 
-      // Catat log audit
       await createAuditLog({
         event: 'KOMISI_TIER_DIUBAH',
         status: 'SUCCESS',
         user: currentUser?.email || 'System Admin',
-        details: `Mengubah Platform Fee tier ${tier?.name || ''} dari ${oldRate}% menjadi ${rateNum}%`
+        details: `Mengubah Platform Fee tier ${tier?.name || ''} dari ${oldRate}% menjadi ${rateNum}%`,
+        targetCollection: 'commission_tiers',
+        targetId: tierId
       });
 
-      alert(`Platform Fee ${tier?.name} berhasil diperbarui!`);
+      toast.success(`Platform Fee ${tier?.name} berhasil diperbarui!`);
       fetchCommissionData();
     } catch (err) {
       console.error("Gagal menyimpan Platform Fee:", err);
-    }
-  };
-
-  const handleRecalibrate = async () => {
-    if (tiers.length === 0) {
-      alert('Tidak ada data tier untuk dikalibrasi.');
-      return;
-    }
-    try {
-      // Hitung rata-rata Platform Fee saat ini
-      const sum = tiers.reduce((acc, t) => acc + t.platformFee, 0);
-      const avg = parseFloat((sum / tiers.length).toFixed(3));
-      
-      const docRef = doc(db, 'settings', 'commission');
-      await updateDoc(docRef, { globalBaseline: avg });
-      setGlobalBaseline(avg);
-
-      // Catat log audit
-      await createAuditLog({
-        event: 'KOMISI_BASELINE_REKALIBRASI',
-        status: 'SUCCESS',
-        user: currentUser?.email || 'System Admin',
-        details: `Menjalankan kalibrasi ulang Baseline Global. Rata-rata baru diset ke ${avg}%`
-      });
-
-      alert(`Kalibrasi ulang berhasil! Baseline Global baru diset ke ${avg}%`);
-    } catch (err) {
-      console.error("Gagal melakukan kalibrasi komisi:", err);
-    }
-  };
-
-  const handleAutoBalancer = async () => {
-    if (tiers.length === 0) {
-      alert('Tidak ada data tier untuk diseimbangkan.');
-      return;
-    }
-
-    // Rekomendasi penyeimbang simulasi: Strategic Enterprise naik 0.05%, yang lainnya turun tipis
-    const adjustments = tiers.map(t => {
-      let change = -0.05;
-      if (t.name.toLowerCase().includes('enterprise')) {
-        change = 0.05;
-      } else if (t.name.toLowerCase().includes('farmers')) {
-        change = -0.1;
-      }
-      
-      const suggested = Math.max(0.1, parseFloat((t.platformFee + change).toFixed(2)));
-      return {
-        ...t,
-        suggestedFee: suggested
-      };
-    });
-
-    const previewLines = adjustments.map(a => 
-      `- ${a.name}: ${a.platformFee}% -> ${a.suggestedFee}%`
-    ).join('\n');
-
-    const confirmed = window.confirm(
-      `Sistem AI Auto-Balancer menyarankan penyesuaian Platform Fee berikut:\n\n` +
-      previewLines +
-      `\n\nApakah Anda yakin ingin menerapkan rekomendasi penyeimbang ini ke database?`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setIsLoading(true);
-      for (const adj of adjustments) {
-        const docRef = doc(db, 'commission_tiers', adj.id);
-        await updateDoc(docRef, { 
-          platformFee: adj.suggestedFee,
-          updatedAt: new Date()
-        });
-      }
-
-      // Catat audit log
-      await createAuditLog({
-        event: 'KOMISI_AUTO_BALANCER',
-        status: 'SUCCESS',
-        user: currentUser?.email || 'System Admin',
-        details: 'Menjalankan AI Auto-Balancer untuk menyeimbangkan Platform Fee di seluruh tier'
-      });
-
-      alert('AI Auto-Balancer berhasil dijalankan dan Platform Fee diperbarui!');
-      fetchCommissionData();
-    } catch (err) {
-      console.error("Gagal menjalankan auto-balancer:", err);
-      alert('Gagal memproses AI Auto-Balancer.');
+      toast.error('Gagal menyimpan Platform Fee');
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -218,7 +158,7 @@ export const CommissionManagement = () => {
             <p className="text-muted-foreground font-medium">Atur pemotongan komisi platform global maupun spesifik per kategori mitra distributor.</p>
          </div>
          <div className="flex gap-4">
-            <Button variant="outline" className="h-14 px-8 rounded-2xl border-border bg-card font-black">
+            <Button variant="outline" className="h-14 px-8 rounded-2xl border-border bg-card font-black" disabled={isLoading || isSaving}>
                <History size={20} className="mr-2" />
                Riwayat Versi
             </Button>
@@ -232,7 +172,6 @@ export const CommissionManagement = () => {
         </div>
       ) : (
         <div className="grid lg:grid-cols-3 gap-12">
-           {/* Global Config */}
            <div className="bg-[#1B2632] rounded-[4rem] p-12 text-[#EEE9DF] shadow-3xl space-y-10 flex flex-col justify-between">
               <div className="space-y-6">
                  <div className="w-16 h-16 bg-[#FFB162]/20 rounded-2xl flex items-center justify-center text-[#FFB162]">
@@ -256,21 +195,10 @@ export const CommissionManagement = () => {
                  </div>
 
                  <div className="space-y-6">
-                    <div className="flex items-center gap-4 p-4 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-500">
-                       <Info size={20} className="shrink-0" />
-                       <p className="text-xs font-bold leading-tight">Menjalankan kalibrasi ulang akan menyesuaikan rata-rata biaya platform berdasarkan tarif tier aktif.</p>
-                    </div>
-                    <Button 
-                      className="w-full h-16 rounded-2xl bg-[#FFB162] text-black font-black text-xl hover:bg-white transition-all shadow-lg shadow-[#FFB162]/10"
-                      onClick={handleRecalibrate}
-                    >
-                       Kalibrasi Ulang Dasar Komisi
-                    </Button>
                  </div>
               </div>
            </div>
 
-           {/* Tiers Management */}
            <div className="lg:col-span-2 space-y-8">
               <div className="flex flex-col sm:flex-row items-center justify-between bg-card border border-border/50 p-6 rounded-[2.5rem] shadow-xl gap-4">
                  <div className="flex bg-muted/40 p-1.5 rounded-2xl border border-border/30 h-14 w-full sm:w-auto">
@@ -330,6 +258,7 @@ export const CommissionManagement = () => {
                                      size="icon" 
                                      className="h-10 w-10 bg-primary text-primary-foreground rounded-xl"
                                      onClick={() => handleSaveRate(tier.id)}
+                                     disabled={isSaving}
                                    >
                                      <Save size={16} />
                                    </Button>
@@ -355,27 +284,13 @@ export const CommissionManagement = () => {
                                     >
                                        <Settings2 size={24} className="text-muted-foreground" />
                                     </Button>
-                                 </div>
+                                  </div>
                                )}
                             </div>
                          </div>
-                      </motion.div>
+                       </motion.div>
                     ))
                  )}
-              </div>
-              
-              <div className="p-10 bg-primary border-4 border-[#1B2632] rounded-[4rem] text-primary-foreground relative overflow-hidden shadow-2xl flex flex-col items-center text-center gap-6">
-                 <RefreshCw className="absolute -top-10 -left-10 w-48 h-48 opacity-10 animate-spin-slow" />
-                 <div className="relative z-10 space-y-2">
-                    <h3 className="text-2xl font-black tracking-tighter">AI Auto-Balancer</h3>
-                    <p className="text-sm font-medium opacity-80 max-w-sm">Aktifkan penyesuaian biaya otomatis berbasis volume perdagangan, likuiditas pasar, dan batas ambang komisi secara dinamis.</p>
-                 </div>
-                 <Button 
-                   className="bg-[#1B2632] text-white font-black uppercase text-xs tracking-[0.2em] px-10 h-14 rounded-2xl hover:bg-white hover:text-black transition-all cursor-pointer"
-                   onClick={handleAutoBalancer}
-                 >
-                    Jalankan Penyeimbang Otomatis
-                 </Button>
               </div>
            </div>
         </div>
