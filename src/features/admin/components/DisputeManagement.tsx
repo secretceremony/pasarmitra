@@ -22,12 +22,12 @@ import {
   ThumbsDown,
   Loader2
 } from 'lucide-react';
-import { collection, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { useAuthStore } from '../../../store/use-auth-store';
-import { createAuditLog } from '../services/adminService';
+import { createAuditLog, updateDisputeStatus } from '../services/adminService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
 
@@ -36,7 +36,9 @@ const DEFAULT_DISPUTES = [
     id: 'dsp-101',
     reason: 'Barang Rusak Saat Pengiriman',
     claimant: 'Toko Kelontong Berkah',
+    buyer_name: 'Toko Kelontong Berkah',
     defendant: 'CV. Sembako Mandiri',
+    distributor_name: 'CV. Sembako Mandiri',
     amount: 'Rp 4.500.000',
     created: '3 jam yang lalu',
     status: 'OPEN',
@@ -46,7 +48,9 @@ const DEFAULT_DISPUTES = [
     id: 'dsp-102',
     reason: 'Keterlambatan Pengiriman 5 Hari',
     claimant: 'Koperasi Tani Makmur',
+    buyer_name: 'Koperasi Tani Makmur',
     defendant: 'PT. Distribusi Logistik Nusantara',
+    distributor_name: 'PT. Distribusi Logistik Nusantara',
     amount: 'Rp 12.000.000',
     created: '1 hari yang lalu',
     status: 'IN_MEDIATION',
@@ -56,7 +60,9 @@ const DEFAULT_DISPUTES = [
     id: 'dsp-103',
     reason: 'Jumlah Pesanan Tidak Sesuai',
     claimant: 'Warung Bu Sri',
+    buyer_name: 'Warung Bu Sri',
     defendant: 'Distributor Sembako Jakarta',
+    distributor_name: 'Distributor Sembako Jakarta',
     amount: 'Rp 1.250.000',
     created: '2 hari yang lalu',
     status: 'OPEN',
@@ -71,6 +77,13 @@ export const DisputeManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { user: currentUser } = useAuthStore();
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Decision states
+  const [actionType, setActionType] = useState<'refund' | 'reject' | 'mediation' | null>(null);
+  const [refundAmountVal, setRefundAmountVal] = useState('');
+  const [refundNoteVal, setRefundNoteVal] = useState('');
+  const [rejectionReasonVal, setRejectionReasonVal] = useState('');
+  const [adminNoteVal, setAdminNoteVal] = useState('');
 
   const fetchDisputes = async () => {
     try {
@@ -92,6 +105,7 @@ export const DisputeManagement = () => {
       }
     } catch (err) {
       console.error("Gagal memuat sengketa:", err);
+      toast.error('Gagal memuat sengketa.');
     } finally {
       setIsLoading(false);
     }
@@ -101,88 +115,95 @@ export const DisputeManagement = () => {
     fetchDisputes();
   }, []);
 
-  const handleRefund = async (disputeId: string) => {
-    if (!window.confirm('Apakah Anda yakin ingin menyetujui pengembalian dana untuk sengketa ini?')) return;
+  // Reset forms when switching disputes
+  useEffect(() => {
+    setActionType(null);
+    setRefundAmountVal('');
+    setRefundNoteVal('');
+    setRejectionReasonVal('');
+    setAdminNoteVal('');
+  }, [selectedId]);
+
+  const handleRefundSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) return;
+    const amountNum = parseFloat(refundAmountVal);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.error('Jumlah refund harus berupa angka valid di atas 0.');
+      return;
+    }
+
+    if (!window.confirm(`Apakah Anda yakin ingin menyetujui refund dana sebesar Rp ${amountNum.toLocaleString()} untuk sengketa ini?`)) {
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const dispute = disputes.find(d => d.id === disputeId);
-      if (!dispute) return;
-      const docRef = doc(db, 'disputes', disputeId);
-      
-      await updateDoc(docRef, { status: 'RESOLVED' });
-      
-      setDisputes(prev => prev.map(d => d.id === disputeId ? { ...d, status: 'RESOLVED' } : d));
-
-      await createAuditLog({
-        event: 'DISPUTE_REFUND',
-        status: 'SUCCESS',
-        user: currentUser?.email || 'System Admin',
-        details: `Menyetujui pengembalian dana sengketa ${disputeId} senilai ${dispute.amount} untuk ${dispute.claimant}`
+      await updateDisputeStatus(selectedId, 'refund', currentUser?.email || 'admin@example.com', {
+        refund_amount: amountNum,
+        refund_note: refundNoteVal
       });
 
-      toast.success('Kasus diselesaikan: Pengembalian dana disetujui.');
-      fetchDisputes();
-    } catch (err) {
-      console.error("Gagal memproses pengembalian dana:", err);
-      toast.error('Gagal memproses pengembalian dana');
+      toast.success('Persetujuan refund berhasil dikirim.');
+      setActionType(null);
+      await fetchDisputes();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Gagal memproses pengembalian dana');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleRejectClaim = async (disputeId: string) => {
-    if (!window.confirm('Apakah Anda yakin ingin menolak klaim sengketa ini?')) return;
+  const handleRejectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) return;
+    if (!rejectionReasonVal.trim()) {
+      toast.error('Alasan penolakan tidak boleh kosong.');
+      return;
+    }
+
+    if (!window.confirm('Apakah Anda yakin ingin menolak klaim sengketa ini?')) {
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const dispute = disputes.find(d => d.id === disputeId);
-      if (!dispute) return;
-      const docRef = doc(db, 'disputes', disputeId);
-      
-      await updateDoc(docRef, { status: 'RESOLVED' });
-      
-      setDisputes(prev => prev.map(d => d.id === disputeId ? { ...d, status: 'RESOLVED' } : d));
-
-      await createAuditLog({
-        event: 'DISPUTE_REJECT',
-        status: 'BLOCK',
-        user: currentUser?.email || 'System Admin',
-        details: `Menolak klaim sengketa ${disputeId} yang diajukan oleh ${dispute.claimant}`
+      await updateDisputeStatus(selectedId, 'reject', currentUser?.email || 'admin@example.com', {
+        rejection_reason: rejectionReasonVal.trim()
       });
 
-      toast.success('Kasus diselesaikan: Klaim sengketa ditolak.');
-      fetchDisputes();
-    } catch (err) {
-      console.error("Gagal menolak klaim sengketa:", err);
-      toast.error('Gagal menolak klaim sengketa');
+      toast.success('Klaim sengketa ditolak.');
+      setActionType(null);
+      await fetchDisputes();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Gagal menolak klaim sengketa');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleTransferToMediator = async (disputeId: string) => {
-    if (!window.confirm('Apakah Anda yakin ingin mentransfer sengketa ini ke mediator internal?')) return;
+  const handleMediationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) return;
+
+    if (!window.confirm('Apakah Anda yakin ingin memindahkan sengketa ini ke mediator internal?')) {
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const dispute = disputes.find(d => d.id === disputeId);
-      if (!dispute) return;
-      const docRef = doc(db, 'disputes', disputeId);
-      
-      await updateDoc(docRef, { status: 'IN_MEDIATION' });
-      
-      setDisputes(prev => prev.map(d => d.id === disputeId ? { ...d, status: 'IN_MEDIATION' } : d));
-
-      await createAuditLog({
-        event: 'DISPUTE_MEDIATION',
-        status: 'WARNING',
-        user: currentUser?.email || 'System Admin',
-        details: `Mentransfer sengketa ${disputeId} ke Mediator Internal`
+      await updateDisputeStatus(selectedId, 'review', currentUser?.email || 'admin@example.com', {
+        admin_note: adminNoteVal.trim()
       });
 
-      toast.success('Kasus ditransfer ke mediator internal.');
-      fetchDisputes();
-    } catch (err) {
-      console.error("Gagal mentransfer sengketa:", err);
-      toast.error('Gagal mentransfer sengketa');
+      toast.success('Sengketa ditransfer ke mediator internal.');
+      setActionType(null);
+      await fetchDisputes();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Gagal mentransfer sengketa');
     } finally {
       setIsProcessing(false);
     }
@@ -194,11 +215,52 @@ export const DisputeManagement = () => {
     const term = searchQuery.toLowerCase();
     return (
       d.id.toLowerCase().includes(term) ||
-      (d.claimant || '').toLowerCase().includes(term) ||
-      (d.defendant || '').toLowerCase().includes(term) ||
+      (d.claimant || d.buyer_name || '').toLowerCase().includes(term) ||
+      (d.defendant || d.distributor_name || '').toLowerCase().includes(term) ||
       (d.reason || '').toLowerCase().includes(term)
     );
   });
+
+  const getDisputeStatusLabel = (dispute: any) => {
+    const statusStr = (dispute.status || '').toUpperCase();
+    const resType = (dispute.resolution_type || '').toUpperCase();
+
+    if (statusStr === 'RESOLVED') {
+      if (resType === 'REFUNDED') return 'REFUNDED';
+      if (resType === 'REJECTED') return 'DITOLAK';
+      return 'SELESAI';
+    }
+    if (statusStr === 'IN_MEDIATION') return 'MEDIASI';
+    return 'TERBUKA';
+  };
+
+  const getDisputeStatusType = (dispute: any) => {
+    const statusStr = (dispute.status || '').toUpperCase();
+    const resType = (dispute.resolution_type || '').toUpperCase();
+
+    if (statusStr === 'RESOLVED') {
+      if (resType === 'REFUNDED') return 'success';
+      if (resType === 'REJECTED') return 'danger';
+      return 'success';
+    }
+    if (statusStr === 'IN_MEDIATION') return 'info';
+    return 'danger';
+  };
+
+  const formatDisputeDate = (dispute: any) => {
+    if (dispute.created) return dispute.created;
+    if (dispute.created_at) {
+      try {
+        const d = typeof dispute.created_at.toDate === 'function' 
+          ? dispute.created_at.toDate() 
+          : new Date(dispute.created_at);
+        return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      } catch {
+        return 'Baru saja';
+      }
+    }
+    return 'Baru saja';
+  };
 
   return (
     <div className="space-y-12">
@@ -240,40 +302,40 @@ export const DisputeManagement = () => {
                    </div>
                 ) : filteredDisputes.length === 0 ? (
                    <div className="text-center py-20 bg-card border border-dashed border-border/50 rounded-[2.5rem] text-sm font-bold text-muted-foreground">
-                      Tidak ada kasus perselisihan aktif.
+                      Belum ada pengajuan komplain atau refund.
                    </div>
                 ) : (
                    filteredDisputes.map((dispute) => (
-                     <motion.div
-                       key={dispute.id}
-                       onClick={() => setSelectedId(dispute.id)}
-                       className={cn(
-                         "p-8 bg-card border rounded-[2.5rem] cursor-pointer transition-all hover:scale-[1.01] shadow-xl relative overflow-hidden group",
-                         selectedId === dispute.id ? "border-[#A35139] ring-2 ring-[#A35139]/20" : "border-border/50 hover:border-[#A35139]/30"
-                       )}
-                     >
-                        <div className="flex justify-between items-start mb-6">
-                           <StatusBadge 
-                            type={dispute.status === 'RESOLVED' ? 'success' : dispute.status === 'IN_MEDIATION' ? 'info' : 'danger'} 
-                            label={dispute.status === 'RESOLVED' ? 'SELESAI' : dispute.status === 'IN_MEDIATION' ? 'MEDIASI' : 'TERBUKA'} 
-                           />
-                           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{dispute.id}</span>
-                        </div>
-                        <div className="space-y-4">
-                           <h4 className="text-xl font-black tracking-tight leading-tight group-hover:text-[#A35139] transition-colors">{dispute.reason}</h4>
-                           <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
-                              <span className="flex items-center gap-1"><User size={12} /> {dispute.claimant}</span>
-                              <ArrowRight size={12} className="text-border" />
-                              <span className="flex items-center gap-1"><Building2 size={12} /> {dispute.defendant}</span>
-                           </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-8 pt-4 border-t border-border/30">
-                           <span className="text-lg font-black italic">{dispute.amount}</span>
-                           <span className="text-[10px] font-black text-muted-foreground flex items-center gap-2"><Clock size={12} /> {dispute.created}</span>
-                        </div>
-                     </motion.div>
-                   ))
-                )}
+                      <motion.div
+                        key={dispute.id}
+                        onClick={() => setSelectedId(dispute.id)}
+                        className={cn(
+                          "p-8 bg-card border rounded-[2.5rem] cursor-pointer transition-all hover:scale-[1.01] shadow-xl relative overflow-hidden group",
+                          selectedId === dispute.id ? "border-[#A35139] ring-2 ring-[#A35139]/20" : "border-border/50 hover:border-[#A35139]/30"
+                        )}
+                      >
+                         <div className="flex justify-between items-start mb-6">
+                            <StatusBadge 
+                             type={getDisputeStatusType(dispute)} 
+                             label={getDisputeStatusLabel(dispute)} 
+                            />
+                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{dispute.id}</span>
+                         </div>
+                         <div className="space-y-4">
+                            <h4 className="text-xl font-black tracking-tight leading-tight group-hover:text-[#A35139] transition-colors">{dispute.reason}</h4>
+                            <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
+                               <span className="flex items-center gap-1"><User size={12} /> {dispute.claimant || dispute.buyer_name || '-'}</span>
+                               <ArrowRight size={12} className="text-border" />
+                               <span className="flex items-center gap-1"><Building2 size={12} /> {dispute.defendant || dispute.distributor_name || '-'}</span>
+                            </div>
+                         </div>
+                         <div className="flex items-center justify-between mt-8 pt-4 border-t border-border/30">
+                            <span className="text-lg font-black italic">{dispute.amount || '-'}</span>
+                            <span className="text-[10px] font-black text-muted-foreground flex items-center gap-2"><Clock size={12} /> {formatDisputeDate(dispute)}</span>
+                         </div>
+                      </motion.div>
+                    ))
+                 )}
             </div>
          </div>
 
@@ -282,18 +344,18 @@ export const DisputeManagement = () => {
             <AnimatePresence mode="wait">
                {selected ? (
                  <motion.div
-                   key={selected.id}
-                   initial={{ opacity: 0, x: 20 }}
-                   animate={{ opacity: 1, x: 0 }}
-                   className="bg-card border border-border/50 rounded-[3.5rem] p-12 shadow-2xl space-y-12 h-fit sticky top-10"
+                    key={selected.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="bg-card border border-border/50 rounded-[3.5rem] p-12 shadow-2xl space-y-12 h-fit sticky top-10"
                  >
                     <div className="flex justify-between items-start">
                        <div className="space-y-4">
                           <div className="flex items-center gap-4">
                              <h2 className="text-4xl font-black tracking-tighter">Pusat Arbitrase</h2>
                              <StatusBadge 
-                               type={selected.status === 'RESOLVED' ? 'success' : selected.status === 'IN_MEDIATION' ? 'info' : 'danger'} 
-                               label={selected.status === 'RESOLVED' ? 'SELESAI' : selected.status === 'IN_MEDIATION' ? 'MEDIASI' : 'TERBUKA'} 
+                               type={getDisputeStatusType(selected)} 
+                               label={getDisputeStatusLabel(selected)} 
                              />
                           </div>
                           <p className="text-muted-foreground font-medium max-w-lg">Penyelidikan atas ketidaksesuaian produk dan kegagalan logistik.</p>
@@ -313,10 +375,10 @@ export const DisputeManagement = () => {
                           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status Penggugat</p>
                           <div className="flex items-center gap-4">
                              <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary font-black italic animate-pulse-slow">
-                                {selected.claimant ? selected.claimant[0] : 'P'}
+                                {selected.claimant || selected.buyer_name ? (selected.claimant || selected.buyer_name)[0] : 'P'}
                              </div>
                              <div>
-                                <p className="font-black">{selected.claimant}</p>
+                                <p className="font-black">{selected.claimant || selected.buyer_name || '-'}</p>
                                 <p className="text-xs font-bold text-muted-foreground">Mitra Terverifikasi</p>
                              </div>
                           </div>
@@ -326,10 +388,10 @@ export const DisputeManagement = () => {
                           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status Tergugat</p>
                           <div className="flex items-center gap-4">
                              <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500 font-black italic animate-pulse-slow">
-                                {selected.defendant ? selected.defendant[0] : 'T'}
+                                {selected.defendant || selected.distributor_name ? (selected.defendant || selected.distributor_name)[0] : 'T'}
                              </div>
                              <div>
-                                <p className="font-black">{selected.defendant}</p>
+                                <p className="font-black">{selected.defendant || selected.distributor_name || '-'}</p>
                                 <p className="text-xs font-bold text-muted-foreground">Distributor Enterprise</p>
                              </div>
                           </div>
@@ -342,67 +404,280 @@ export const DisputeManagement = () => {
                           <AlertCircle className="text-[#A35139]" size={20} />
                           Detail Permasalahan
                        </h3>
-                       <div className="p-8 bg-muted/20 border border-border/30 rounded-[2rem] text-sm font-medium leading-relaxed text-muted-foreground">
-                          {selected.description || 'Tidak ada deskripsi detail yang disediakan.'}
+                       <div className="p-8 bg-muted/20 border border-border/30 rounded-[2rem] text-sm font-bold text-muted-foreground space-y-4 leading-relaxed">
+                          <p className="text-foreground">Alasan: {selected.reason}</p>
+                          {selected.evidence_note && (
+                            <p>Catatan Bukti: {selected.evidence_note}</p>
+                          )}
+                          {selected.description && selected.description !== selected.reason && selected.description !== selected.evidence_note && (
+                            <p>Deskripsi Tambahan: {selected.description}</p>
+                          )}
+                          {selected.requested_resolution && (
+                            <p>Resolusi Diharapkan: <span className="text-[#A35139] capitalize font-black">{selected.requested_resolution === 'refund' ? 'Refund Dana' : selected.requested_resolution === 'replacement' ? 'Ganti Barang' : 'Tinjauan Admin'}</span></p>
+                          )}
+                          {(selected.order_code || selected.order_id || selected.orderId) && (
+                            <p>ID Pesanan: <span className="text-foreground font-black">#{selected.order_code || selected.order_id || selected.orderId}</span></p>
+                          )}
                        </div>
                     </div>
 
-                    <div className="space-y-6">
-                       <h3 className="text-xl font-black flex items-center gap-3">
-                          <FileText className="text-[#A35139]" />
-                          Bukti & Dokumen Pendukung
-                       </h3>
-                       <div className="grid grid-cols-4 gap-4">
-                          {[1, 2, 3, 4].map(idx => (
-                            <div key={idx} className="aspect-square bg-muted/30 border border-dashed border-border/50 rounded-2xl flex items-center justify-center group cursor-pointer hover:border-[#A35139] transition-all">
-                               <Package size={24} className="text-muted-foreground opacity-50 group-hover:text-[#A35139]" />
+                    {(selected.evidence_url || selected.evidence_note) ? (
+                       <div className="space-y-6">
+                          <h3 className="text-xl font-black flex items-center gap-3">
+                             <FileText className="text-[#A35139]" />
+                             Bukti & Dokumen Pendukung
+                          </h3>
+                          {selected.evidence_url ? (
+                            <div className="flex flex-col gap-4">
+                              <div className="p-6 bg-muted/20 border border-border/30 rounded-2xl flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                  <FileText className="text-primary" size={24} />
+                                  <div className="text-left">
+                                    <p className="text-sm font-bold truncate max-w-xs">File Bukti Pengajuan</p>
+                                    <p className="text-[10px] text-muted-foreground">Dokumen pendukung terlampir</p>
+                                  </div>
+                                </div>
+                                <a 
+                                  href={selected.evidence_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-black rounded-xl transition-all"
+                                >
+                                  Buka File
+                                </a>
+                              </div>
+                              {selected.evidence_url.match(/\.(jpeg|jpg|gif|png)/i) && (
+                                <div className="max-w-md border border-border/30 rounded-2xl overflow-hidden shadow-md">
+                                  <img src={selected.evidence_url} alt="Bukti Sengketa" className="w-full object-cover" />
+                                </div>
+                              )}
                             </div>
-                          ))}
+                          ) : (
+                            <div className="p-8 text-center bg-muted/10 border border-dashed border-border/50 rounded-2xl text-xs font-bold text-muted-foreground">
+                              Tidak ada lampiran file bukti.
+                            </div>
+                          )}
                        </div>
-                    </div>
+                    ) : (
+                       <div className="space-y-6">
+                          <h3 className="text-xl font-black flex items-center gap-3">
+                             <FileText className="text-[#A35139]" />
+                             Bukti & Dokumen Pendukung
+                          </h3>
+                          <div className="grid grid-cols-4 gap-4">
+                             {[1, 2, 3, 4].map(idx => (
+                               <div key={idx} className="aspect-square bg-muted/30 border border-dashed border-border/50 rounded-2xl flex items-center justify-center group cursor-pointer hover:border-[#A35139] transition-all">
+                                  <Package size={24} className="text-muted-foreground opacity-50 group-hover:text-[#A35139]" />
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+                    )}
 
                     {selected.status === 'RESOLVED' ? (
-                       <div className="p-8 bg-emerald-500/10 border border-emerald-500/20 rounded-[2.5rem] flex items-center gap-6">
-                          <CheckCircle2 className="text-emerald-500 shrink-0" size={32} />
-                          <div>
-                             <p className="font-black text-emerald-500 text-lg">Kasus Telah Selesai</p>
-                             <p className="text-sm text-muted-foreground font-medium">Perselisihan ini telah diselesaikan secara damai dan resmi ditutup oleh administrator.</p>
+                       <div className="p-8 bg-emerald-500/10 border border-emerald-500/20 rounded-[2.5rem] space-y-6">
+                          <div className="flex items-center gap-6">
+                             <CheckCircle2 className="text-emerald-500 shrink-0" size={32} />
+                             <div>
+                                <p className="font-black text-emerald-500 text-lg">
+                                  {selected.resolution_type === 'REFUNDED' ? 'Refund Disetujui' : 
+                                   selected.resolution_type === 'REJECTED' ? 'Klaim Ditolak' : 'Kasus Selesai'}
+                                </p>
+                                <p className="text-sm text-muted-foreground font-medium">Perselisihan ini telah diselesaikan secara resmi oleh administrator.</p>
+                             </div>
+                          </div>
+                          
+                          <div className="border-t border-emerald-500/20 pt-4 space-y-3 text-sm font-bold text-muted-foreground">
+                             {selected.resolution_type === 'REFUNDED' && (
+                               <>
+                                 <p className="text-foreground">Jumlah Refund: <span className="text-emerald-500 font-black">Rp {(selected.refund_amount || 0).toLocaleString()}</span></p>
+                                 {selected.refund_note && <p>Catatan Refund: {selected.refund_note}</p>}
+                               </>
+                             )}
+                             {selected.resolution_type === 'REJECTED' && selected.rejection_reason && (
+                               <p className="text-rose-500">Alasan Penolakan: {selected.rejection_reason}</p>
+                             )}
+                             {selected.admin_note && (
+                               <p>Catatan Admin: {selected.admin_note}</p>
+                             )}
+                             <p className="text-xs text-muted-foreground font-normal">Ditinjau oleh: {selected.reviewed_by || 'Admin'} pada {selected.reviewed_at ? (typeof selected.reviewed_at.toDate === 'function' ? selected.reviewed_at.toDate().toLocaleString() : new Date(selected.reviewed_at).toLocaleString()) : '-'}</p>
                           </div>
                        </div>
                     ) : (
                        <div className="space-y-8 pt-8 border-t border-border/30">
                           <h3 className="text-2xl font-black tracking-tight">Keputusan Akhir</h3>
-                          <div className="grid md:grid-cols-2 gap-6">
-                             <Button 
-                               onClick={() => handleRefund(selected.id)}
-                               className="h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg shadow-xl shadow-emerald-500/20 flex gap-3 cursor-pointer items-center justify-center"
-                               disabled={isProcessing}
-                             >
-                                {isProcessing ? <Loader2 className="animate-spin text-white" size={24} /> : <CheckCircle2 size={24} />}
-                                Setujui Pengembalian
-                             </Button>
-                             <Button 
-                               onClick={() => handleRejectClaim(selected.id)}
-                               className="h-16 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-lg shadow-xl shadow-rose-500/20 flex gap-3 cursor-pointer items-center justify-center"
-                               disabled={isProcessing}
-                             >
-                                {isProcessing ? <Loader2 className="animate-spin text-white" size={24} /> : <XCircle size={24} />}
-                                Tolak Klaim
-                             </Button>
-                          </div>
-                          <Button 
-                            onClick={() => handleTransferToMediator(selected.id)}
-                            variant="outline" 
-                            className="w-full h-14 rounded-2xl border-border bg-card font-black uppercase text-xs tracking-widest flex gap-3 hover:bg-muted/50 transition-all cursor-pointer items-center justify-center"
-                            disabled={isProcessing}
-                          >
-                             {isProcessing ? (
-                               <Loader2 className="animate-spin text-muted-foreground" size={18} />
-                             ) : (
-                               <MessageSquareText size={18} />
-                             )}
-                             Transfer ke Mediator Internal
-                          </Button>
+
+                          {actionType === null ? (
+                             <div className="space-y-6">
+                                <div className="grid md:grid-cols-2 gap-6">
+                                   <Button 
+                                     onClick={() => {
+                                       setActionType('refund');
+                                       const rawAmount = selected.amount ? parseFloat(selected.amount.replace(/[^0-9]/g, '')) : 0;
+                                       setRefundAmountVal(rawAmount ? rawAmount.toString() : '');
+                                       setRefundNoteVal('');
+                                     }}
+                                     className="h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg shadow-xl shadow-emerald-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                     disabled={isProcessing}
+                                   >
+                                      <CheckCircle2 size={24} />
+                                      Setujui Pengembalian
+                                   </Button>
+                                   <Button 
+                                     onClick={() => {
+                                       setActionType('reject');
+                                       setRejectionReasonVal('');
+                                     }}
+                                     className="h-16 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-lg shadow-xl shadow-rose-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                     disabled={isProcessing}
+                                   >
+                                      <XCircle size={24} />
+                                      Tolak Klaim
+                                   </Button>
+                                </div>
+                                <Button 
+                                  onClick={() => {
+                                    setActionType('mediation');
+                                    setAdminNoteVal('');
+                                  }}
+                                  variant="outline" 
+                                  className="w-full h-14 rounded-2xl border-border bg-card font-black uppercase text-xs tracking-widest flex gap-3 hover:bg-muted/50 transition-all cursor-pointer items-center justify-center"
+                                  disabled={isProcessing}
+                                >
+                                   <MessageSquareText size={18} />
+                                   Transfer ke Mediator Internal
+                                </Button>
+                             </div>
+                          ) : actionType === 'refund' ? (
+                             <form onSubmit={handleRefundSubmit} className="p-8 bg-emerald-500/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6">
+                                <h4 className="text-lg font-black text-emerald-500 flex items-center gap-2">
+                                  <CheckCircle2 size={20} /> Form Persetujuan Refund
+                                </h4>
+                                
+                                <div className="space-y-2">
+                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    Jumlah Pengembalian Dana (IDR) <span className="text-rose-500">*</span>
+                                  </label>
+                                  <input 
+                                    type="number"
+                                    required
+                                    value={refundAmountVal}
+                                    onChange={(e) => setRefundAmountVal(e.target.value)}
+                                    placeholder="Contoh: 150000"
+                                    className="w-full h-14 bg-card border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all"
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    Catatan Persetujuan Refund
+                                  </label>
+                                  <textarea 
+                                    value={refundNoteVal}
+                                    onChange={(e) => setRefundNoteVal(e.target.value)}
+                                    placeholder="Jelaskan alasan persetujuan atau catatan transfer dana..."
+                                    rows={3}
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                  />
+                                </div>
+
+                                <div className="flex gap-4">
+                                  <Button 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={() => setActionType(null)}
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl border-border font-bold uppercase text-xs tracking-wider"
+                                  >
+                                    Batal
+                                  </Button>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-xs tracking-wider flex gap-2 items-center justify-center shadow-lg shadow-emerald-500/10"
+                                  >
+                                    {isProcessing ? <Loader2 className="animate-spin" size={16} /> : 'Kirim Refund'}
+                                  </Button>
+                                </div>
+                             </form>
+                          ) : actionType === 'reject' ? (
+                             <form onSubmit={handleRejectSubmit} className="p-8 bg-rose-500/5 border border-rose-500/20 rounded-[2.5rem] space-y-6">
+                                <h4 className="text-lg font-black text-rose-500 flex items-center gap-2">
+                                  <XCircle size={20} /> Form Penolakan Klaim
+                                </h4>
+                                
+                                <div className="space-y-2">
+                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    Alasan Penolakan <span className="text-rose-500">*</span>
+                                  </label>
+                                  <textarea 
+                                    required
+                                    value={rejectionReasonVal}
+                                    onChange={(e) => setRejectionReasonVal(e.target.value)}
+                                    placeholder="Jelaskan secara detail mengapa klaim sengketa ditolak..."
+                                    rows={4}
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                  />
+                                </div>
+
+                                <div className="flex gap-4">
+                                  <Button 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={() => setActionType(null)}
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl border-border font-bold uppercase text-xs tracking-wider"
+                                  >
+                                    Batal
+                                  </Button>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold uppercase text-xs tracking-wider flex gap-2 items-center justify-center shadow-lg shadow-rose-500/10"
+                                  >
+                                    {isProcessing ? <Loader2 className="animate-spin" size={16} /> : 'Kirim Penolakan'}
+                                  </Button>
+                                </div>
+                             </form>
+                          ) : (
+                             <form onSubmit={handleMediationSubmit} className="p-8 bg-blue-500/5 border border-blue-500/20 rounded-[2.5rem] space-y-6">
+                                <h4 className="text-lg font-black text-blue-500 flex items-center gap-2">
+                                  <MessageSquareText size={20} /> Transfer ke Mediator Internal
+                                </h4>
+                                
+                                <div className="space-y-2">
+                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    Catatan Internal Admin / Instruksi Mediasi
+                                  </label>
+                                  <textarea 
+                                    value={adminNoteVal}
+                                    onChange={(e) => setAdminNoteVal(e.target.value)}
+                                    placeholder="Tambahkan catatan khusus untuk mediator..."
+                                    rows={4}
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                  />
+                                </div>
+
+                                <div className="flex gap-4">
+                                  <Button 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={() => setActionType(null)}
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl border-border font-bold uppercase text-xs tracking-wider"
+                                  >
+                                    Batal
+                                  </Button>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase text-xs tracking-wider flex gap-2 items-center justify-center shadow-lg shadow-blue-500/10"
+                                  >
+                                    {isProcessing ? <Loader2 className="animate-spin" size={16} /> : 'Kirim ke Mediator'}
+                                  </Button>
+                                </div>
+                             </form>
+                          )}
                        </div>
                     )}
                  </motion.div>

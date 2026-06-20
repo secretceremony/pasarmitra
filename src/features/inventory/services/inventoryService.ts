@@ -29,6 +29,8 @@ export interface Product {
   image_url: string;
   tiered_pricing: TieredPrice[];
   distributor_id: string;
+  moderation_status?: string;
+  distributor_name?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -48,12 +50,76 @@ export const inventoryService = {
     return products;
   },
 
+  getActiveProducts: async () => {
+    const q = query(
+      collection(db, 'products'),
+      where('is_active', '==', true)
+    );
+    const querySnapshot = await getDocs(q);
+    const products: Product[] = [];
+    querySnapshot.forEach((doc) => {
+      products.push({ id: doc.id, ...doc.data() } as Product);
+    });
+    // Sort in memory to avoid requiring complex composite indexes in Firestore
+    products.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    return products;
+  },
+
   createProduct: async (product: Omit<Product, 'id' | 'created_at'>) => {
+    let distributorName = 'Distributor';
+    let isVerified = false;
+    try {
+      const distSnap = await getDoc(doc(db, 'profiles', product.distributor_id));
+      if (distSnap.exists()) {
+        const distData = distSnap.data();
+        distributorName = distData.organization_name || distData.business_name || distData.full_name || 'Distributor';
+        isVerified = distData.is_verified || false;
+      }
+    } catch (e) {
+      console.error('Error fetching distributor profile for product creation:', e);
+    }
+
+    if (!isVerified) {
+      throw new Error('Distributor belum terverifikasi secara legal dan tidak dapat menambahkan produk.');
+    }
+
     const newProduct = {
       ...product,
+      is_active: false, // Inactive by default until approved
+      moderation_status: 'PENDING',
+      distributor_name: distributorName,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
+    
+    // Save to products
     const docRef = await addDoc(collection(db, 'products'), newProduct);
+    
+    // Save to moderation_items
+    const modItem = {
+      type: 'PRODUCT',
+      targetType: 'PRODUCT',
+      targetId: docRef.id,
+      productId: docRef.id,
+      title: product.name,
+      author: distributorName,
+      distributor_id: product.distributor_id,
+      status: 'pending',
+      reason: 'Persetujuan Produk Baru',
+      timestamp: new Date().toLocaleString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      image: product.image_url || null,
+    };
+    
+    await addDoc(collection(db, 'moderation_items'), modItem);
+    
     return { id: docRef.id, ...newProduct } as Product;
   },
 

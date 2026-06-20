@@ -143,7 +143,13 @@ export const AdminDashboard = () => {
   // Financial metrics
   const completedOrders = orders.filter(o => o.status === 'delivered');
   const totalVolume = completedOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-  const commissionRevenue = totalVolume * (globalBaseline / 100);
+  const commissionRevenue = completedOrders.reduce((sum, o) => {
+    const fee = o.platform_fee ?? o.service_fee;
+    if (fee !== undefined && fee !== null) {
+      return sum + Number(fee);
+    }
+    return sum + (Number(o.total_amount) || 0) * (globalBaseline / 100);
+  }, 0);
   const subscriptionRevenue = 0; // Safe fallback Rp 0
   const platformRevenue = commissionRevenue + subscriptionRevenue;
 
@@ -182,10 +188,15 @@ export const AdminDashboard = () => {
 
     orders.forEach(o => {
       if (o.status === 'delivered' && o.created_at) {
-        const d = new Date(o.created_at);
-        const mName = months[d.getMonth()];
-        if (volumeMap[mName] !== undefined) {
-          volumeMap[mName] += Number(o.total_amount) || 0;
+        try {
+          const d = new Date(o.created_at);
+          if (isNaN(d.getTime())) return;
+          const mName = months[d.getMonth()];
+          if (volumeMap[mName] !== undefined) {
+            volumeMap[mName] += Number(o.total_amount) || 0;
+          }
+        } catch (e) {
+          console.error("Invalid date in monthly transaction volume calculation:", o.created_at, e);
         }
       }
     });

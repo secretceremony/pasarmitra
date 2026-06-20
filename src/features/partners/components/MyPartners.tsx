@@ -24,6 +24,11 @@ export const MyPartners = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (user?.role === 'UMKM') {
+      navigate('/dashboard');
+      return;
+    }
+
     const fetchPartners = async () => {
       if (!user?.id) return;
       try {
@@ -37,7 +42,7 @@ export const MyPartners = () => {
       }
     };
     fetchPartners();
-  }, [user?.id]);
+  }, [user, navigate]);
 
   return (
     <div className="space-y-12">

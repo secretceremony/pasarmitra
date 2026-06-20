@@ -19,6 +19,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Product } from '../../inventory/services/inventoryService';
+import { useAuthStore } from '../../../store/use-auth-store';
+import { NegotiationModal } from '../../partners/components/NegotiationModal';
 
 interface Distributor {
   id: string;
@@ -36,9 +38,11 @@ interface Distributor {
 export const DistributorProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [distributor, setDistributor] = useState<Distributor | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedNegotiateProduct, setSelectedNegotiateProduct] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchDistributorData = async () => {
@@ -139,10 +143,15 @@ export const DistributorProfile = () => {
                </div>
             </div>
             <div className="flex gap-4 pb-4">
-               <Button className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20">
-                  <MessageSquareText size={20} className="mr-2" />
-                  Negosiasi
-               </Button>
+               {user?.role === 'UMKM' && products.length > 0 && (
+                  <Button 
+                     className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20"
+                     onClick={() => setSelectedNegotiateProduct({ ...products[0], distributor_name: distributor.name })}
+                  >
+                     <MessageSquareText size={20} className="mr-2" />
+                     Negosiasi Harga
+                  </Button>
+               )}
                <Button variant="outline" className="h-14 px-8 rounded-2xl border-border bg-card/60 backdrop-blur-xl font-black text-lg">
                   Ajukan Kemitraan
                </Button>
@@ -245,16 +254,25 @@ export const DistributorProfile = () => {
                          </div>
                          <div className="p-8 space-y-4">
                             <h4 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{prod.name}</h4>
-                            <div className="flex items-center justify-between">
-                               <div>
-                                  <p className="text-3xl font-black">Rp {prod.price.toLocaleString()}</p>
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Per {prod.unit_type}</p>
-                               </div>
-                               <div className="text-right">
-                                  <p className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm cursor-pointer hover:bg-primary hover:text-white transition-all">Harga Bertingkat</p>
-                               </div>
-                            </div>
-                         </div>
+                             <div className="flex items-center justify-between">
+                                <div>
+                                   <p className="text-3xl font-black">Rp {prod.price.toLocaleString()}</p>
+                                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Per {prod.unit_type}</p>
+                                </div>
+                                <div className="text-right">
+                                   <p className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm cursor-pointer hover:bg-primary hover:text-white transition-all">Harga Bertingkat</p>
+                                </div>
+                             </div>
+                             {user?.role === 'UMKM' && (
+                                <Button 
+                                   variant="outline" 
+                                   className="w-full mt-4 h-12 rounded-2xl border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground font-black text-xs uppercase tracking-wider"
+                                   onClick={() => setSelectedNegotiateProduct({ ...prod, distributor_name: distributor.name })}
+                                >
+                                   Negosiasi Harga
+                                </Button>
+                             )}
+                          </div>
                       </motion.div>
                     ))}
                  </div>
@@ -262,6 +280,16 @@ export const DistributorProfile = () => {
             </div>
          </div>
       </div>
+
+      {selectedNegotiateProduct && (
+         <NegotiationModal
+           isOpen={!!selectedNegotiateProduct}
+           onClose={() => setSelectedNegotiateProduct(null)}
+           product={selectedNegotiateProduct}
+           umkmId={user?.id || ''}
+           umkmName={user?.full_name || user?.email || 'Pembeli UMKM'}
+         />
+       )}
     </div>
   );
 };

@@ -7,7 +7,8 @@ import {
   Trash2, 
   TrendingUp, 
   ArrowUpDown,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../../../components/ui/button';
@@ -16,6 +17,8 @@ import { InventoryStatusBadge } from './InventoryStatusBadge';
 import { StockIndicator } from './StockIndicator';
 import { inventoryService, Product } from '../services/inventoryService';
 import { useAuthStore } from '../../../store/use-auth-store';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export const ProductManagement = () => {
   const { user } = useAuthStore();
@@ -68,6 +71,10 @@ export const ProductManagement = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (!user.is_verified) {
+      toast.error("Akun Anda belum terverifikasi secara legal. Silakan lengkapi berkas legalitas usaha Anda.");
+      return;
+    }
     try {
       const newProduct = await inventoryService.createProduct({
         name,
@@ -93,8 +100,10 @@ export const ProductManagement = () => {
       setMinOrder(1);
       setImageUrl('');
       setTiers([]);
-    } catch (err) {
+      toast.success("Produk baru berhasil ditambahkan dan diajukan untuk verifikasi moderasi.");
+    } catch (err: any) {
       console.error("Gagal menambahkan produk:", err);
+      toast.error(err.message || "Gagal menambahkan produk.");
     }
   };
 
@@ -125,12 +134,36 @@ export const ProductManagement = () => {
         </div>
         <Button 
           onClick={() => setIsAddModalOpen(true)}
-          className="h-16 px-10 rounded-[2rem] bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
+          disabled={!user?.is_verified}
+          className="h-16 px-10 rounded-[2rem] bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+          title={!user?.is_verified ? 'Lengkapi verifikasi legalitas usaha Anda untuk menambah produk' : 'Tambah produk baru'}
         >
           <Plus size={24} className="mr-2" />
           Tambah Produk Baru
         </Button>
       </div>
+
+      {/* Alert Banner for Unverified Distributors */}
+      {!user?.is_verified && (
+        <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-lg shadow-amber-500/5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+              <AlertCircle size={24} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black tracking-tight text-amber-800">Akun Belum Terverifikasi</h3>
+              <p className="text-sm font-semibold text-amber-700/80 leading-relaxed mt-0.5">
+                Anda harus melengkapi portofolio dokumen legalitas usaha Anda sebelum dapat mempublikasikan produk di PasarMitra.
+              </p>
+            </div>
+          </div>
+          <Link to="/distributor/legal-docs">
+            <Button className="h-12 px-6 rounded-xl bg-amber-600 text-white font-black hover:bg-amber-700 whitespace-nowrap">
+              Lengkapi Dokumen
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Stats Quick View */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

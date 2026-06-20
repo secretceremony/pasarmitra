@@ -12,6 +12,28 @@ export interface UserProfile {
   role: UserRole;
   organization_name?: string;
   is_verified: boolean;
+  verification_status?: string;
+  address?: string;
+  phone?: string;
+  description?: string;
+  is_suspended?: boolean;
+  nib?: string;
+  nib_url?: string;
+  npwp?: string;
+  npwp_url?: string;
+  warehouse_permit?: string;
+  warehouse_permit_url?: string;
+  rejection_reason?: string;
+  audit_note?: string;
+  legal_info?: {
+    company_name: string;
+    nib: string;
+    npwp: string;
+    business_address: string;
+    phone: string;
+    submitted_at: string;
+  };
+  updated_at?: string;
   created_at: string;
 }
 

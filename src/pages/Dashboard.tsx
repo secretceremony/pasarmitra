@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuthStore } from '../store/use-auth-store';
 import { DistributorDashboard } from '../features/distributor/components/DistributorDashboard';
 import { useDashboardData } from '../modules/dashboard/hooks/useDashboardData';
+import { useMarketplaceCart } from '../features/marketplace/hooks/useMarketplaceCart';
 
 // Modular Sections
 import { HeroSection } from '../modules/dashboard/components/HeroSection';
@@ -19,6 +20,7 @@ import { PremiumPromo } from '../modules/dashboard/components/PremiumPromo';
 export default function Dashboard() {
   const { user } = useAuthStore();
   const { deals, suppliers } = useDashboardData();
+  const { handleQuickAdd } = useMarketplaceCart();
 
   if (user?.role === 'DISTRIBUTOR') {
     return <DistributorDashboard />;
@@ -32,7 +34,7 @@ export default function Dashboard() {
 
       <WholesaleDeals 
         deals={deals.data} 
-        onQuickAdd={(p) => console.log('Quick add:', p.name)}
+        onQuickAdd={handleQuickAdd}
       />
 
       <div className="grid lg:grid-cols-2 gap-12">

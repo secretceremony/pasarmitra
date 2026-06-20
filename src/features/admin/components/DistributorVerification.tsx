@@ -15,7 +15,7 @@ import {
   Search,
   Loader2
 } from 'lucide-react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
 import { StatusBadge } from '../../../components/common/StatusBadge';
@@ -50,7 +50,7 @@ export const DistributorVerification = () => {
             id: doc.id,
             company: data.organization_name || data.full_name || 'PT. Tanpa Nama',
             type: 'DISTRIBUTOR PERUSAHAAN',
-            submitted: data.created_at ? new Date(data.created_at).toLocaleDateString('id-ID', {
+            submitted: (data.updated_at || data.created_at) ? new Date(data.updated_at || data.created_at).toLocaleDateString('id-ID', {
               day: '2-digit',
               month: 'short',
               year: 'numeric'
@@ -63,8 +63,16 @@ export const DistributorVerification = () => {
               { name: 'Izin Operasional Gudang', status: data.warehouse_permit ? 'APPROVED' : 'MISSING', url: data.warehouse_permit_url || null }
             ],
             requestedBadge: data.requested_badge || null,
-            submittedAt: data.created_at || null,
-            location: data.address || 'Indonesia'
+            submittedAt: data.updated_at || data.created_at || null,
+            location: data.address || 'Indonesia',
+            nib: data.nib || null,
+            npwp: data.npwp || null,
+            warehouse_permit: data.warehouse_permit || null,
+            email: data.email || null,
+            phone: data.phone || null,
+            address: data.address || null,
+            organization_name: data.organization_name || null,
+            verification_status: data.verification_status || 'PENDING_REVIEW'
           });
         }
       });
@@ -109,6 +117,28 @@ export const DistributorVerification = () => {
         audit_note: auditNote || null
       });
 
+      // Update separate verification request doc status if it exists
+      try {
+        const reqQuery = query(
+          collection(db, 'verification_requests'),
+          where('distributor_id', '==', selectedId),
+          where('status', '==', 'PENDING_REVIEW')
+        );
+        const reqSnap = await getDocs(reqQuery);
+        if (!reqSnap.empty) {
+          for (const reqDoc of reqSnap.docs) {
+            await updateDoc(doc(db, 'verification_requests', reqDoc.id), {
+              status: 'VERIFIED',
+              reviewed_at: new Date().toISOString(),
+              reviewer_id: currentUser?.id || 'System Admin',
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      } catch (reqErr) {
+        console.error('Error updating verification request status:', reqErr);
+      }
+
       await createAuditLog({
         event: 'DISTRIBUTOR_VERIFICATION_APPROVED',
         status: 'SUCCESS',
@@ -147,6 +177,29 @@ export const DistributorVerification = () => {
         audit_note: auditNote
       });
 
+      // Update separate verification request doc status if it exists
+      try {
+        const reqQuery = query(
+          collection(db, 'verification_requests'),
+          where('distributor_id', '==', selectedId),
+          where('status', '==', 'PENDING_REVIEW')
+        );
+        const reqSnap = await getDocs(reqQuery);
+        if (!reqSnap.empty) {
+          for (const reqDoc of reqSnap.docs) {
+            await updateDoc(doc(db, 'verification_requests', reqDoc.id), {
+              status: 'REJECTED',
+              rejection_reason: auditNote,
+              reviewed_at: new Date().toISOString(),
+              reviewer_id: currentUser?.id || 'System Admin',
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      } catch (reqErr) {
+        console.error('Error updating verification request status:', reqErr);
+      }
+
       await createAuditLog({
         event: 'DISTRIBUTOR_VERIFICATION_REJECTED',
         status: 'WARNING',
@@ -182,6 +235,28 @@ export const DistributorVerification = () => {
         verification_status: 'ESCALATED',
         audit_note: auditNote
       });
+
+      // Update separate verification request doc status if it exists
+      try {
+        const reqQuery = query(
+          collection(db, 'verification_requests'),
+          where('distributor_id', '==', selectedId),
+          where('status', '==', 'PENDING_REVIEW')
+        );
+        const reqSnap = await getDocs(reqQuery);
+        if (!reqSnap.empty) {
+          for (const reqDoc of reqSnap.docs) {
+            await updateDoc(doc(db, 'verification_requests', reqDoc.id), {
+              status: 'ESCALATED',
+              reviewed_at: new Date().toISOString(),
+              reviewer_id: currentUser?.id || 'System Admin',
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      } catch (reqErr) {
+        console.error('Error updating verification request status:', reqErr);
+      }
 
       await createAuditLog({
         event: 'DISTRIBUTOR_VERIFICATION_ESCALATED',
@@ -221,11 +296,11 @@ export const DistributorVerification = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'VERIFIED': return 'Diverifikasi';
-      case 'PENDING_REVIEW': return 'Menunggu Verifikasi';
-      case 'PENDING': return 'Menunggu Verifikasi';
+      case 'VERIFIED': return 'Terverifikasi';
+      case 'PENDING_REVIEW': return 'Menunggu Review';
+      case 'PENDING': return 'Menunggu Review';
       case 'REJECTED': return 'Ditolak';
-      case 'ESCALATED': return 'Eskalasi Legal';
+      case 'ESCALATED': return 'Dieskalasikan';
       default: return status || '-';
     }
   };
@@ -385,7 +460,47 @@ export const DistributorVerification = () => {
                         </div>
                      </div>
 
-                     {/* Document checklist */}
+                      {/* Business Legal Details */}
+                      <div className="px-6 md:px-8 pt-5 pb-4 space-y-4 border-b border-border/30 bg-muted/5">
+                         <h3 className="text-sm font-black flex items-center gap-2">
+                            <Building2 className="text-primary" size={15} />
+                            Informasi Detail Legalitas
+                         </h3>
+                         <div className="grid grid-cols-2 gap-4 text-xs font-bold">
+                            <div className="space-y-1 col-span-2 sm:col-span-1">
+                               <span className="text-muted-foreground block uppercase text-[10px] tracking-wider">Nama Perusahaan</span>
+                               <span className="text-foreground">{selected?.organization_name || selected?.company || '-'}</span>
+                            </div>
+                            <div className="space-y-1 col-span-2 sm:col-span-1">
+                               <span className="text-muted-foreground block uppercase text-[10px] tracking-wider">Email Kontak</span>
+                               <span className="text-foreground">{selected?.email || '-'}</span>
+                            </div>
+                            <div className="space-y-1 col-span-2 sm:col-span-1">
+                               <span className="text-muted-foreground block uppercase text-[10px] tracking-wider">No. Telepon</span>
+                               <span className="text-foreground">{selected?.phone || '-'}</span>
+                            </div>
+                            <div className="space-y-1 col-span-2 sm:col-span-1">
+                               <span className="text-muted-foreground block uppercase text-[10px] tracking-wider">Alamat Bisnis</span>
+                               <span className="text-foreground">{selected?.address || selected?.location || '-'}</span>
+                            </div>
+                            <div className="space-y-1 col-span-2 sm:col-span-1">
+                               <span className="text-muted-foreground block uppercase text-[10px] tracking-wider">Nomor NIB</span>
+                               <span className="text-foreground font-mono">{selected?.nib || 'Belum Ada'}</span>
+                            </div>
+                            <div className="space-y-1 col-span-2 sm:col-span-1">
+                               <span className="text-muted-foreground block uppercase text-[10px] tracking-wider">NPWP Perusahaan</span>
+                               <span className="text-foreground font-mono">{selected?.npwp || 'Belum Ada'}</span>
+                            </div>
+                            {selected?.warehouse_permit && (
+                              <div className="space-y-1 col-span-2">
+                                 <span className="text-muted-foreground block uppercase text-[10px] tracking-wider">Izin Operasional Gudang</span>
+                                 <span className="text-foreground font-mono">{selected?.warehouse_permit}</span>
+                              </div>
+                            )}
+                         </div>
+                      </div>
+
+                      {/* Document checklist */}
                      <div className="px-6 md:px-8 pt-5 pb-4 space-y-3">
                         <h3 className="text-sm font-black flex items-center gap-2">
                            <FileText className="text-primary" size={15} />

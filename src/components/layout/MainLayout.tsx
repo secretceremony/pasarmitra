@@ -49,36 +49,31 @@ const CATEGORIES = [
 ];
 
 const UMKM_NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Dashboard', href: '/umkm/dashboard', icon: LayoutDashboard },
   { label: 'Marketplace', href: '/marketplace', icon: Store },
-  { label: 'Browse Products', href: '/products', icon: Search },
-  { label: 'Distributors', href: '/distributors', icon: Users },
   { label: 'Orders', href: '/orders', icon: ShoppingBag },
-  { label: 'Negotiations', href: '/negotiations', icon: MessageSquareText },
-  { label: 'My Partners', icon: Heart, href: '/my-partners' },
-  { label: 'Financials', href: '/financials', icon: Wallet },
+  { label: 'Negosiasi Harga', href: '/umkm/negosiasi-harga', icon: MessageSquareText },
+  { label: 'Profile / Settings', href: '/umkm/profile', icon: Settings },
 ];
 
 const DISTRIBUTOR_NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Dashboard', href: '/distributor/dashboard', icon: LayoutDashboard },
   { label: 'My Inventory', href: '/inventory', icon: Package },
-  { label: 'Incoming Orders', href: '/orders', icon: ShoppingBag },
-  { label: 'UMKM Partners', href: '/partners', icon: Users },
-  { label: 'Negotiations', href: '/negotiations', icon: MessageSquareText },
-  { label: 'Shipping', href: '/shipping', icon: Truck },
-  { label: 'Sales Analytics', href: '/analytics', icon: TrendingUp },
-  { label: 'Legal docs', href: '/legal', icon: ShieldCheck },
+  { label: 'Orders', href: '/orders', icon: ShoppingBag },
+  { label: 'Negosiasi Harga', href: '/distributor/negosiasi-harga', icon: MessageSquareText },
+  { label: 'Verification Docs', href: '/distributor/legal-docs', icon: ShieldCheck },
+  { label: 'Profile / Settings', href: '/distributor/profile', icon: Settings },
 ];
 
 const ADMIN_NAV_ITEMS = [
-  { label: 'Admin Dashboard', href: '/admin', icon: LayoutDashboard },
+  { label: 'Admin Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
   { label: 'Moderasi Produk', href: '/admin/moderation', icon: Box },
   { label: 'Finances', href: '/admin/finances', icon: Wallet },
-  { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
   { label: 'Disputes', href: '/admin/disputes', icon: Handshake },
   { label: 'Audit Logs', href: '/admin/audit', icon: Settings },
+  { label: 'Profile / Settings', href: '/admin/profile', icon: Settings },
 ];
 
 export const MainLayout = () => {
@@ -215,25 +210,31 @@ export const MainLayout = () => {
                     )}
                   </AnimatePresence>
                 </div>
-                <Button variant="outline" size="icon" className="h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all">
-                   <MessageSquareText className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className={cn("h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all relative", rightSidebarOpen && "bg-primary/10 border-primary/20 text-primary")}
-                  onClick={() => {
-                    setRightSidebarOpen(!rightSidebarOpen);
-                    if (showNotifications) setShowNotifications(false);
-                  }}
-                >
-                   <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
-                   {totalItems() > 0 && (
-                     <span className="absolute -top-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-primary text-primary-foreground rounded-full border-2 border-background flex items-center justify-center text-[8px] md:text-[10px] font-black group-hover:scale-110 transition-transform">
-                       {totalItems()}
-                     </span>
-                   )}
-                </Button>
+                {user?.role && user?.role !== 'ADMIN' && (
+                  <Link to={user.role === 'UMKM' ? '/umkm/negosiasi-harga' : '/distributor/negosiasi-harga'}>
+                    <Button variant="outline" size="icon" className="h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all">
+                       <MessageSquareText className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
+                    </Button>
+                  </Link>
+                )}
+                {user?.role === 'UMKM' && (
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className={cn("h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all relative", rightSidebarOpen && "bg-primary/10 border-primary/20 text-primary")}
+                    onClick={() => {
+                      setRightSidebarOpen(!rightSidebarOpen);
+                      if (showNotifications) setShowNotifications(false);
+                    }}
+                  >
+                     <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
+                     {totalItems() > 0 && (
+                       <span className="absolute -top-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-primary text-primary-foreground rounded-full border-2 border-background flex items-center justify-center text-[8px] md:text-[10px] font-black group-hover:scale-110 transition-transform">
+                         {totalItems()}
+                       </span>
+                     )}
+                  </Button>
+                )}
               </>
             )}
 

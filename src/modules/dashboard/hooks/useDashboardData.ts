@@ -45,6 +45,8 @@ export function useDashboardData() {
           stock: data.stock || 0,
           minOrder: `${data.min_order_quantity || 1} ${data.unit_type || 'Unit'}`,
           distributor: distributorName,
+          distributorId: data.distributor_id || '',
+          unit: data.unit_type || 'Unit',
           image: data.image_url || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=400',
           discount: data.discount_tag || '',
         });

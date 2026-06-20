@@ -4,3 +4,4 @@ export * from './AuthInput';
 export * from './AuthError';
 export * from './AuthSuccess';
 export * from './AuthBackButton';
+export * from './ProfileSettings';

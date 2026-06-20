@@ -29,20 +29,115 @@ const PENDING_NEGOTIATIONS = [
   { id: 'NEG-101', partner: 'Retailer Jakarta Central', subject: 'Oil Tier 3 Pricing', discount: '2%', status: 'Offered' },
 ];
 
+import { useAuthStore } from '../../../store/use-auth-store';
+import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+
 export const DistributorDashboard = () => {
+  const { user } = useAuthStore();
+
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    pendingOrders: 0,
+    completedOrders: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user?.id) return;
+      try {
+        setIsLoadingStats(true);
+        const q = query(collection(db, 'orders'), where('distributor_id', '==', user.id));
+        const querySnapshot = await getDocs(q);
+        
+        let revenue = 0;
+        let pending = 0;
+        let completed = 0;
+        let total = querySnapshot.size;
+
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const amount = data.total_amount || 0;
+          const status = data.status || 'pending';
+
+          if (status !== 'cancelled') {
+            revenue += amount;
+          }
+          if (status === 'pending' || status === 'processing' || status === 'shipped') {
+            pending++;
+          }
+          if (status === 'delivered') {
+            completed++;
+          }
+        });
+
+        setStats({
+          totalRevenue: revenue,
+          totalOrders: total,
+          pendingOrders: pending,
+          completedOrders: completed
+        });
+      } catch (err) {
+        console.error("Gagal memuat statistik distributor:", err);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+  }, [user?.id]);
+
   return (
     <div className="space-y-10">
+      {/* Verification Warning Card for Unverified Distributors */}
+      {user && !user.is_verified && (
+        <div className="p-8 bg-amber-500/10 border border-amber-500/20 rounded-[2.5rem] flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-xl shadow-amber-500/5">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+               <AlertCircle size={28} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black tracking-tight text-amber-800">
+                {user.verification_status === 'PENDING_REVIEW' ? 'Akun Dalam Proses Verifikasi' :
+                 user.verification_status === 'REJECTED' ? 'Verifikasi Legalitas Ditolak' :
+                 user.verification_status === 'ESCALATED' ? 'Pengajuan Sedang Ditinjau Khusus' :
+                 'Akun Belum Terverifikasi'}
+              </h3>
+              <p className="text-sm font-semibold text-amber-700/80 leading-relaxed mt-1">
+                {user.verification_status === 'PENDING_REVIEW' ? 'Pengajuan dokumen legalitas Anda sedang diperiksa oleh admin.' :
+                 user.verification_status === 'REJECTED' ? `Pengajuan Anda ditolak: ${user.rejection_reason || 'Periksa kembali dokumen Anda.'}` :
+                 user.verification_status === 'ESCALATED' ? 'Verifikasi Anda diteruskan ke tim legal untuk audit khusus.' :
+                 'Anda belum mengajukan berkas legalitas usaha distributor. Lengkapi verifikasi untuk mulai menjual produk.'}
+              </p>
+            </div>
+          </div>
+          {(user.verification_status === 'NOT_SUBMITTED' || !user.verification_status || user.verification_status === 'REJECTED') && (
+            <Link to="/distributor/legal-docs">
+              <Button className="h-14 px-8 rounded-2xl bg-amber-600 text-white font-black hover:bg-amber-700 shadow-lg shadow-amber-600/20 whitespace-nowrap">
+                Lengkapi Verifikasi
+              </Button>
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Welcome Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tighter">Distributor Control</h1>
-          <p className="text-muted-foreground font-medium text-lg">Manage your inventory, partners, and logistics in real-time.</p>
+          <p className="text-muted-foreground font-medium text-lg">Manage your inventory, order fulfillment, and business verification in real-time.</p>
         </div>
         <div className="flex gap-4">
-           <Button className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black shadow-lg shadow-primary/20">
-              <Package className="mr-2" size={20} />
-              Add Product
-           </Button>
+           <Link to="/inventory">
+             <Button className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black shadow-lg shadow-primary/20">
+                <Package className="mr-2" size={20} />
+                Add Product
+             </Button>
+           </Link>
            <Button variant="outline" className="h-14 px-8 rounded-2xl border-border bg-card/40 font-black">
               Export Reports
            </Button>
@@ -52,31 +147,31 @@ export const DistributorDashboard = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <AnalyticsCard 
-          title="Total Sales (MTD)" 
-          value="Rp 1.28B" 
+          title="Total Pendapatan" 
+          value={isLoadingStats ? '...' : `Rp ${stats.totalRevenue.toLocaleString('id-ID')}`} 
           icon={DollarSign} 
-          trend={{ value: 18.4, isUp: true }}
+          trend={null}
           className="bg-emerald-500/5 border-emerald-500/20"
         />
         <AnalyticsCard 
-          title="Active Dealers" 
-          value="482" 
-          icon={Users} 
-          trend={{ value: 5.2, isUp: true }}
+          title="Total Pesanan" 
+          value={isLoadingStats ? '...' : stats.totalOrders.toString()} 
+          icon={ShoppingBag} 
+          trend={null}
           className="bg-blue-500/5 border-blue-500/20"
         />
         <AnalyticsCard 
-          title="Pending Shipments" 
-          value="24" 
-          icon={Truck} 
-          trend={{ value: 2.1, isUp: false }}
+          title="Pesanan Berjalan" 
+          value={isLoadingStats ? '...' : stats.pendingOrders.toString()} 
+          icon={Clock} 
+          trend={null}
           className="bg-amber-500/5 border-amber-500/20"
         />
         <AnalyticsCard 
-          title="Avg. Margin" 
-          value="12.4%" 
-          icon={TrendingUp} 
-          trend={{ value: 0.8, isUp: true }}
+          title="Pesanan Selesai" 
+          value={isLoadingStats ? '...' : stats.completedOrders.toString()} 
+          icon={CheckCircle2} 
+          trend={null}
           className="bg-purple-500/5 border-purple-500/20"
         />
       </div>
@@ -88,7 +183,9 @@ export const DistributorDashboard = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
                <h3 className="text-2xl font-black tracking-tight">Recent Incoming Orders</h3>
-               <Button variant="link" className="text-primary font-bold">View All Orders</Button>
+               <Link to="/orders">
+                 <Button variant="link" className="text-primary font-bold">View All Orders</Button>
+               </Link>
             </div>
             <div className="grid gap-4">
                {RECENT_ORDERS.map((order) => (
@@ -124,7 +221,9 @@ export const DistributorDashboard = () => {
                       )}>
                         {order.status}
                       </span>
-                      <Button size="sm" variant="outline" className="rounded-xl font-bold opacity-100 sm:opacity-0 sm:group-hover:opacity-100">Process</Button>
+                      <Link to="/orders">
+                        <Button size="sm" variant="outline" className="rounded-xl font-bold opacity-100 sm:opacity-0 sm:group-hover:opacity-100">Process</Button>
+                      </Link>
                    </div>
                  </motion.div>
                ))}
@@ -175,10 +274,14 @@ export const DistributorDashboard = () => {
                         <span className="text-xs font-bold text-muted-foreground">Requesting</span>
                         <span className="text-sm font-black text-primary">-{neg.discount} Discount</span>
                      </div>
-                     <div className="flex gap-3">
-                        <Button className="flex-1 h-10 rounded-xl bg-primary text-white text-xs font-black">Counter</Button>
-                        <Button variant="outline" className="flex-1 h-10 rounded-xl text-xs font-black">Reject</Button>
-                     </div>
+                      <div className="flex gap-3">
+                         <Link to="/negotiations" className="flex-1">
+                           <Button className="w-full h-10 rounded-xl bg-primary text-white text-xs font-black">Counter</Button>
+                         </Link>
+                         <Link to="/negotiations" className="flex-1">
+                           <Button variant="outline" className="w-full h-10 rounded-xl text-xs font-black">Reject</Button>
+                         </Link>
+                      </div>
                   </div>
                 ))}
              </div>

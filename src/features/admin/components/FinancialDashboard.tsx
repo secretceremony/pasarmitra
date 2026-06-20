@@ -93,7 +93,16 @@ export const FinancialDashboard = () => {
   const totalVolume = orders
     .filter(o => o.status === 'delivered')
     .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-  const platformRevenue = totalVolume * globalBaseline;
+  
+  const platformRevenue = orders
+    .filter(o => o.status === 'delivered')
+    .reduce((sum, o) => {
+      const fee = o.platform_fee ?? o.service_fee;
+      if (fee !== undefined && fee !== null) {
+        return sum + Number(fee);
+      }
+      return sum + (Number(o.total_amount) || 0) * globalBaseline;
+    }, 0);
 
   const pendingPayouts = orders
     .filter(o => o.status !== 'delivered' && o.status !== 'cancelled')
@@ -120,10 +129,19 @@ export const FinancialDashboard = () => {
 
     orders.forEach(o => {
       if (o.status === 'delivered' && o.created_at) {
-        const d = new Date(o.created_at);
-        const dayName = days[d.getDay()];
-        if (revenueMap[dayName] !== undefined) {
-          revenueMap[dayName] += (Number(o.total_amount) || 0) * globalBaseline;
+        try {
+          const d = new Date(o.created_at);
+          if (isNaN(d.getTime())) return;
+          const dayName = days[d.getDay()];
+          if (revenueMap[dayName] !== undefined) {
+            const fee = o.platform_fee ?? o.service_fee;
+            const revenueContribution = (fee !== undefined && fee !== null)
+              ? Number(fee)
+              : (Number(o.total_amount) || 0) * globalBaseline;
+            revenueMap[dayName] += revenueContribution;
+          }
+        } catch (e) {
+          console.error("Invalid date in weekly revenue calculation:", o.created_at, e);
         }
       }
     });

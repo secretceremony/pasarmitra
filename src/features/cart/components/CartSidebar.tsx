@@ -14,6 +14,7 @@ import {
 import { Button } from '../../../components/ui/button';
 import { useCartStore } from '../../../store/useCartStore';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export const CartSidebar = ({ onClose }: { onClose: () => void }) => {
   const { items, removeItem, updateQuantity, totalPrice, totalItems } = useCartStore();
@@ -72,7 +73,12 @@ export const CartSidebar = ({ onClose }: { onClose: () => void }) => {
                         </button>
                         <span className="font-black text-sm w-4 text-center">{item.quantity}</span>
                         <button 
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => {
+                            const success = updateQuantity(item.id, item.quantity + 1);
+                            if (!success) {
+                              toast.error("Jumlah melebihi stok tersedia.");
+                            }
+                          }}
                           className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-all text-primary"
                         >
                            <Plus size={14} />

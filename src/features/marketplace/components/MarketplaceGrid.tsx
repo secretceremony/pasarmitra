@@ -7,9 +7,10 @@ interface MarketplaceGridProps {
   products: MarketplaceProduct[];
   onAddToCart: (product: MarketplaceProduct) => void;
   onViewDistributor: (distributorId: string) => void;
+  onNegotiate?: (product: MarketplaceProduct) => void;
 }
 
-export function MarketplaceGrid({ products, onAddToCart, onViewDistributor }: MarketplaceGridProps) {
+export function MarketplaceGrid({ products, onAddToCart, onViewDistributor, onNegotiate }: MarketplaceGridProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
       <AnimatePresence mode="popLayout">
@@ -19,6 +20,7 @@ export function MarketplaceGrid({ products, onAddToCart, onViewDistributor }: Ma
             product={prod} 
             onAddToCart={onAddToCart} 
             onDistributorClick={onViewDistributor} 
+            onNegotiate={onNegotiate}
           />
         ))}
       </AnimatePresence>

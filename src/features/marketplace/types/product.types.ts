@@ -9,4 +9,5 @@ export interface MarketplaceProduct {
   unit: string;
   distributor: string;
   distributorId: string;
+  stock?: number;
 }

@@ -18,6 +18,7 @@ export const dashboardAdapters = {
         amount: typeof raw.price === 'string' ? parseInt(raw.price.replace(/[^\d]/g, '')) : raw.price,
         currency: 'IDR',
         minOrder: raw.minOrder,
+        unit: raw.unit,
       },
       inventory: {
         stock: raw.stock || 0,
@@ -25,6 +26,7 @@ export const dashboardAdapters = {
         unitsLeft: raw.stock,
       },
       supplier: {
+        id: raw.distributorId,
         name: raw.distributor,
       },
       image: raw.image,

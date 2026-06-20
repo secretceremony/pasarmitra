@@ -4,6 +4,7 @@ import { ShieldCheck, Plus } from "lucide-react";
 import { StatusBadge } from "../../../components/common/StatusBadge";
 import { ReputationBadge } from "../../../components/common/ReputationBadge";
 import { MarketplaceProduct } from "../types/product.types";
+import { Button } from "../../../components/ui/button";
 import { 
   SUPPLIER_TIER_CONFIG, 
   MARKETPLACE_UI_STRINGS, 
@@ -14,9 +15,10 @@ interface MarketplaceProductCardProps {
   product: MarketplaceProduct;
   onAddToCart(product: MarketplaceProduct): void;
   onDistributorClick(id: string): void;
+  onNegotiate?(product: MarketplaceProduct): void;
 }
 
-export function MarketplaceProductCard({ product, onAddToCart, onDistributorClick }: MarketplaceProductCardProps) {
+export function MarketplaceProductCard({ product, onAddToCart, onDistributorClick, onNegotiate }: MarketplaceProductCardProps) {
   const tier = SUPPLIER_TIER_CONFIG.GOLD;
 
   return (
@@ -72,17 +74,28 @@ export function MarketplaceProductCard({ product, onAddToCart, onDistributorClic
             </h3>
          </div>
          
-         <div className="flex flex-wrap items-end justify-between gap-2 pt-4 border-t border-border/30">
-            <div className="min-w-0">
-               <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{MARKETPLACE_UI_STRINGS.pricePer} {product.unit}</p>
-               <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter block truncate">
-                  Rp {product.price.toLocaleString()}
-               </span>
+         <div className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-2 pt-4 border-t border-border/30">
+               <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{MARKETPLACE_UI_STRINGS.pricePer} {product.unit}</p>
+                  <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter block truncate">
+                     Rp {product.price.toLocaleString()}
+                  </span>
+               </div>
+               <div className="text-right shrink-0">
+                  <p className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded uppercase tracking-tighter mb-1">{MARKETPLACE_UI_STRINGS.minOrder}</p>
+                  <p className="text-xs sm:text-sm font-black italic">{product.bulk}</p>
+               </div>
             </div>
-            <div className="text-right shrink-0">
-               <p className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded uppercase tracking-tighter mb-1">{MARKETPLACE_UI_STRINGS.minOrder}</p>
-               <p className="text-xs sm:text-sm font-black italic">{product.bulk}</p>
-            </div>
+            {onNegotiate && (
+               <Button 
+                 variant="outline" 
+                 className="w-full h-12 rounded-2xl border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground font-black text-xs uppercase tracking-wider"
+                 onClick={(e) => { e.stopPropagation(); onNegotiate(product); }}
+               >
+                 Negosiasi Harga
+               </Button>
+            )}
          </div>
       </div>
     </motion.div>

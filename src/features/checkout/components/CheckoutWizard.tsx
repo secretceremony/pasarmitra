@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CreditCard, 
   Truck, 
@@ -9,32 +9,346 @@ import {
   ShieldCheck,
   ShoppingBag,
   Clock,
-  Plus
+  Plus,
+  Loader2,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../../../components/ui/button';
 import { cn } from '../../../lib/utils';
-import { useNavigate } from 'react-router-dom';
-import { useCartStore } from '../../../store/useCartStore';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCartStore, CartItem } from '../../../store/useCartStore';
+import { useAuthStore } from '../../../store/use-auth-store';
+import { orderService } from '../../orders/services/orderService';
+import { createAuditLog } from '../../admin/services/adminService';
+import { toast } from 'sonner';
+import { db } from '../../../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { negotiationService } from '../../partners/services/negotiationService';
 
 const STEPS = ['Shipping', 'Payment', 'Review', 'Success'];
+
+const generateOrderCode = () => {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const randNum = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
+  return `ORD-${dateStr}-${randNum}`;
+};
 
 export const CheckoutWizard = () => {
   const [step, setStep] = useState(0);
   const navigate = useNavigate();
-  const { items, totalPrice, clearCart } = useCartStore();
+  const { items: cartItems, totalPrice: cartTotalPrice, clearCart } = useCartStore();
+  const { user } = useAuthStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdOrderCodes, setCreatedOrderCodes] = useState<string[]>([]);
+  
+  const [searchParams] = useSearchParams();
+  const negotiationId = searchParams.get('negotiationId');
+  const [negotiation, setNegotiation] = useState<any | null>(null);
+  const [isLoadingNeg, setIsLoadingNeg] = useState(false);
+  const [negError, setNegError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!negotiationId || !user) return;
+    
+    const fetchNegotiation = async () => {
+      try {
+        setIsLoadingNeg(true);
+        setNegError(null);
+        
+        // 1. Fetch negotiation document
+        const negRef = doc(db, 'negotiations', negotiationId);
+        const negSnap = await getDoc(negRef);
+        if (!negSnap.exists()) {
+          setNegError('Data negosiasi tidak ditemukan.');
+          return;
+        }
+        
+        const negData = { id: negSnap.id, ...negSnap.data() } as any;
+        
+        // 2. Strict participant-based access control
+        if (negData.umkm_id !== user.id) {
+          setNegError('Akses ditolak. Anda tidak berwenang melakukan checkout untuk negosiasi ini.');
+          return;
+        }
+        
+        // 3. Status checks
+        if (negData.status === 'converted_to_order') {
+          setNegotiation(negData);
+          return;
+        }
+        
+        if (negData.status !== 'accepted') {
+          setNegError('Hanya negosiasi berstatus disetujui (accepted) yang dapat dilanjutkan ke checkout.');
+          return;
+        }
+        
+        // 4. Revalidate: product stock, MOQ, active status
+        const productRef = doc(db, 'products', negData.product_id);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) {
+          setNegError('Produk negosiasi tidak ditemukan.');
+          return;
+        }
+        const product = productSnap.data();
+        if (!product.is_active) {
+          setNegError('Produk negosiasi sedang tidak aktif.');
+          return;
+        }
+        if (negData.quantity > (product.stock || 0)) {
+          setNegError(`Stok produk tidak mencukupi. Tersedia: ${product.stock || 0}, Diminta: ${negData.quantity}`);
+          return;
+        }
+        if (negData.quantity < (product.min_order_quantity || 1)) {
+          setNegError(`Jumlah pesanan minimal adalah ${product.min_order_quantity || 1}. Jumlah negosiasi: ${negData.quantity}`);
+          return;
+        }
+        
+        // 5. Revalidate distributor status
+        const distRef = doc(db, 'profiles', negData.distributor_id);
+        const distSnap = await getDoc(distRef);
+        if (!distSnap.exists()) {
+          setNegError('Distributor tidak ditemukan.');
+          return;
+        }
+        const distributor = distSnap.data();
+        if (distributor.is_suspended) {
+          setNegError('Akun distributor sedang ditangguhkan.');
+          return;
+        }
+        
+        setNegotiation({ ...negData, productUnit: product.unit_type || 'Unit' });
+      } catch (err) {
+        console.error('Error fetching negotiation for checkout:', err);
+        setNegError('Gagal memuat data negosiasi.');
+      } finally {
+        setIsLoadingNeg(false);
+      }
+    };
+    
+    fetchNegotiation();
+  }, [negotiationId, user]);
+
+  const items: CartItem[] = negotiationId
+    ? (negotiation && negotiation.status !== 'converted_to_order'
+        ? [
+            {
+              id: negotiation.product_id,
+              name: negotiation.product_name,
+              quantity: negotiation.quantity,
+              price: negotiation.agreed_unit_price || negotiation.requested_unit_price,
+              unit_type: negotiation.productUnit || 'Unit',
+              image_url: negotiation.product_image || undefined,
+              distributor_id: negotiation.distributor_id,
+              distributor_name: negotiation.distributor_name || undefined,
+            },
+          ]
+        : [])
+    : cartItems;
+
+  const totalPrice = () => {
+    if (negotiationId) {
+      if (!negotiation) return 0;
+      return (negotiation.agreed_unit_price || negotiation.requested_unit_price) * negotiation.quantity;
+    }
+    return cartTotalPrice();
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!user) {
+      toast.error("Anda harus login untuk melakukan checkout.");
+      return;
+    }
+
+    if (items.length === 0 && !negotiationId) {
+      toast.error("Keranjang belanja Anda kosong.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    if (negotiationId) {
+      if (!negotiation) {
+        toast.error("Data negosiasi belum siap.");
+        setIsSubmitting(false);
+        return;
+      }
+      try {
+        const result = await negotiationService.checkoutNegotiation(
+          negotiation.id,
+          user.id,
+          user.full_name || user.email || '',
+          user.email || '',
+          'Jl. Menteng Raya No. 42, Jakarta Pusat, DKI Jakarta 10310',
+          'Credit Term (30 Days)'
+        );
+        setCreatedOrderCodes([result.order_code]);
+        toast.success("Pesanan dari negosiasi berhasil dibuat.");
+        setStep(3);
+      } catch (err: any) {
+        console.error('Failed to checkout negotiation:', err);
+        toast.error(err.message || "Gagal membuat pesanan dari negosiasi.");
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    try {
+      // 1. Group items by distributor_id
+      const grouped: Record<string, typeof items> = {};
+      for (const item of items) {
+        const distId = item.distributor_id;
+        if (!grouped[distId]) {
+          grouped[distId] = [];
+        }
+        grouped[distId].push(item);
+      }
+
+      // Prepare orders array for batch creation
+      const ordersToCreate = Object.entries(grouped).map(([distId, distItems]) => {
+        const orderCode = generateOrderCode();
+        const orderSubtotal = distItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+        const distributorName = distItems[0].distributor_name || 'Distributor';
+
+        // Prepare order items
+        const orderItems = distItems.map((item) => ({
+          id: `item-${Math.random().toString(36).substring(7)}`,
+          product_id: item.id,
+          product_name: item.name,
+          quantity: item.quantity,
+          price_per_unit: item.price,
+          total_price: item.price * item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity,
+          unit: item.unit_type || 'Unit',
+          image_url: item.image_url || ''
+        }));
+
+        const orderData = {
+          buyer_id: user.id,
+          buyer_name: user.full_name || '',
+          buyer_email: user.email || '',
+          distributor_id: distId,
+          distributor_name: distributorName,
+          items: orderItems,
+          subtotal: orderSubtotal,
+          total_amount: orderSubtotal,
+          shipping_address: 'Jl. Menteng Raya No. 42, Jakarta Pusat, DKI Jakarta 10310', // Default address from Step 0
+          payment_status: 'unpaid' as const,
+          status: 'pending' as const,
+          payment_method: 'Credit Term (30 Days)', // Default payment from Step 1
+          shipping_cost: 0,
+          service_fee: 0,
+          platform_fee: 0
+        };
+
+        return {
+          order_code: orderCode,
+          data: orderData
+        };
+      });
+
+      // 2. Perform atomic batch write
+      const createdOrders = await orderService.createOrdersBatch(ordersToCreate);
+      const generatedCodes = ordersToCreate.map(o => o.order_code);
+
+      // 3. Write Audit Logs (wrapped in try-catch to not block checkout on failure)
+      for (const order of createdOrders) {
+        try {
+          await createAuditLog({
+            event: 'ORDER_CREATED',
+            status: 'SUCCESS',
+            user: user.email,
+            details: `Order created: ${order.order_code}, distributor: ${order.distributor_name}, amount: Rp ${order.total_amount.toLocaleString()}`,
+            targetCollection: 'orders',
+            targetId: order.id
+          });
+        } catch (auditErr) {
+          console.error("Error writing audit log:", auditErr);
+        }
+      }
+
+      // Success sequence
+      setCreatedOrderCodes(generatedCodes);
+      toast.success("Pesanan berhasil dibuat.");
+      clearCart();
+      setStep(3);
+    } catch (err: any) {
+      console.error('Failed to place order:', err);
+      toast.error("Gagal membuat pesanan. Silakan coba lagi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleNext = () => {
     if (step === 2) {
-      // Simulate order processing
-      setTimeout(() => {
-        setStep(3);
-        clearCart();
-      }, 1500);
+      handlePlaceOrder();
     } else {
       setStep(step + 1);
     }
   };
+
+  if (isLoadingNeg) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center gap-4 text-muted-foreground">
+        <Loader2 className="animate-spin text-primary" size={40} />
+        <p className="font-black text-xs uppercase tracking-widest">Validasi Data Negosiasi...</p>
+      </div>
+    );
+  }
+
+  if (negError) {
+    return (
+      <div className="max-w-xl mx-auto py-20 text-center space-y-8 bg-card border border-border/50 rounded-[4rem] shadow-3xl p-10">
+        <div className="w-24 h-24 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto">
+          <X size={48} />
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-3xl font-black tracking-tight text-rose-500">Gagal Memproses Checkout</h2>
+          <p className="text-muted-foreground font-medium">{negError}</p>
+        </div>
+        <div className="flex gap-4 justify-center">
+          <Button onClick={() => navigate('/negotiations')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black">
+            Kembali ke Negosiasi
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-8 rounded-2xl border-border">
+            Kembali ke Beranda
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (negotiationId && negotiation?.status === 'converted_to_order') {
+    return (
+      <div className="max-w-xl mx-auto py-20 text-center space-y-8 bg-card border border-border/50 rounded-[4rem] shadow-3xl p-10">
+        <div className="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto">
+          <CheckCircle2 size={48} />
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-3xl font-black tracking-tight">Checkout Selesai</h2>
+          <p className="text-muted-foreground font-medium">
+            Negosiasi ini telah berhasil dikonversi menjadi pesanan sebelumnya. Anda tidak dapat melakukan checkout ulang.
+          </p>
+          {negotiation.converted_order_id && (
+            <div className="p-4 bg-muted/40 rounded-2xl font-bold text-sm">
+              ID Pesanan: <span className="text-primary font-mono">{negotiation.converted_order_id}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-4 justify-center">
+          <Button onClick={() => navigate('/orders')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black">
+            Lihat Daftar Pesanan
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-8 rounded-2xl border-border">
+            Kembali ke Beranda
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 pb-20">
@@ -218,12 +532,12 @@ export const CheckoutWizard = () => {
                       <div className="w-32 h-32 bg-emerald-500 rounded-[2.5rem] flex items-center justify-center text-white mx-auto shadow-2xl shadow-emerald-500/20 animate-bounce">
                          <CheckCircle2 size={64} />
                       </div>
-                      <div className="space-y-3 px-12">
-                         <h2 className="text-5xl font-black tracking-tighter">Order Success!</h2>
-                         <p className="text-muted-foreground font-medium text-lg leading-relaxed max-w-md mx-auto">
-                            Your procurement request <span className="text-foreground font-black">#ORD-42177</span> has been logged. Distributors are processing fulfillment.
-                         </p>
-                      </div>
+                       <div className="space-y-3 px-12">
+                          <h2 className="text-5xl font-black tracking-tighter">Pesanan Berhasil Dibuat!</h2>
+                          <p className="text-muted-foreground font-medium text-lg leading-relaxed max-w-md mx-auto">
+                             Your procurement request <span className="text-foreground font-black">#{createdOrderCodes.join(', ')}</span> has been logged. Distributors are processing fulfillment.
+                          </p>
+                       </div>
                       <div className="flex gap-4 justify-center">
                          <Button onClick={() => navigate('/orders')} className="h-14 px-10 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/30">
                             Track Order
@@ -276,16 +590,16 @@ export const CheckoutWizard = () => {
                  </div>
               </div>
 
-              {step < 3 && (
-                <Button 
-                  onClick={handleNext}
-                  disabled={items.length === 0}
-                  className="w-full h-16 rounded-2xl bg-[#06110B] text-primary font-black text-xl shadow-2xl shadow-primary/20 border border-primary/20 hover:scale-105 active:scale-95 transition-all"
-                >
-                   {step === 2 ? 'Place Order' : 'Continue'}
-                   <ChevronRight size={24} className="ml-2" />
-                </Button>
-              )}
+               {step < 3 && (
+                 <Button 
+                   onClick={handleNext}
+                   disabled={items.length === 0 || isSubmitting}
+                   className="w-full h-16 rounded-2xl bg-[#06110B] text-primary font-black text-xl shadow-2xl shadow-primary/20 border border-primary/20 hover:scale-105 active:scale-95 transition-all"
+                 >
+                    {isSubmitting ? 'Memproses...' : step === 2 ? 'Place Order' : 'Continue'}
+                    <ChevronRight size={24} className="ml-2" />
+                 </Button>
+               )}
            </div>
 
            <div className="p-8 bg-primary/5 border border-primary/20 rounded-[2.5rem] flex items-center gap-6">
