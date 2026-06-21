@@ -8,7 +8,8 @@ import {
   TrendingUp, 
   ArrowUpDown,
   X,
-  AlertCircle
+  AlertCircle,
+  Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../../../components/ui/button';
@@ -17,15 +18,17 @@ import { InventoryStatusBadge } from './InventoryStatusBadge';
 import { StockIndicator } from './StockIndicator';
 import { inventoryService, Product } from '../services/inventoryService';
 import { useAuthStore } from '../../../store/use-auth-store';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export const ProductManagement = () => {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -41,8 +44,22 @@ export const ProductManagement = () => {
     if (!user?.id) return;
     try {
       setIsLoading(true);
-      const data = await inventoryService.getDistributorProducts(user.id);
+
+      // Run backfill database migration for demo products once per session
+      const sessionKey = `PM_PRODUCT_OWNER_BACKFILL_DONE_${user.id}`;
+      if (!sessionStorage.getItem(sessionKey)) {
+        await inventoryService.backfillProductDistributorFields(user.id);
+        sessionStorage.setItem(sessionKey, 'true');
+      }
+
+      const data = await inventoryService.getProductsByDistributor(user.id);
       setProducts(data);
+
+      // Debug logs
+      if (import.meta.env.DEV) {
+        console.log('[ProductManagement] distributorId:', user.id);
+        console.log('[ProductManagement] products found:', data.length);
+      }
     } catch (err) {
       console.error("Gagal memuat produk:", err);
     } finally {
@@ -53,6 +70,32 @@ export const ProductManagement = () => {
   useEffect(() => {
     fetchProducts();
   }, [user?.id]);
+
+  const handleCloseModal = () => {
+    setIsAddModalOpen(false);
+    setEditingProduct(null);
+    setName('');
+    setCategory('Sembako');
+    setUnitType('Box');
+    setPrice(0);
+    setStock(0);
+    setMinOrder(1);
+    setImageUrl('');
+    setTiers([]);
+  };
+
+  const handleEditClick = (product: Product) => {
+    setEditingProduct(product);
+    setName(product.name);
+    setCategory(product.category);
+    setUnitType(product.unit_type);
+    setPrice(product.price);
+    setStock(product.stock);
+    setMinOrder(product.min_order_quantity);
+    setImageUrl(product.image_url || '');
+    setTiers(product.tiered_pricing || []);
+    setIsAddModalOpen(true);
+  };
 
   const handleAddTier = () => {
     setTiers([...tiers, { min_quantity: 10, price_per_unit: price || 10000 }]);
@@ -76,34 +119,41 @@ export const ProductManagement = () => {
       return;
     }
     try {
-      const newProduct = await inventoryService.createProduct({
-        name,
-        category,
-        description: 'Tidak ada deskripsi yang disediakan.',
-        price,
-        stock,
-        min_order_quantity: minOrder,
-        unit_type: unitType,
-        image_url: imageUrl || '/assets/fallback-product.png',
-        tiered_pricing: tiers,
-        distributor_id: user.id,
-        is_active: true,
-      });
-      setProducts([newProduct, ...products]);
-      setIsAddModalOpen(false);
-      // Reset form
-      setName('');
-      setCategory('Sembako');
-      setUnitType('Box');
-      setPrice(0);
-      setStock(0);
-      setMinOrder(1);
-      setImageUrl('');
-      setTiers([]);
-      toast.success("Produk baru berhasil ditambahkan dan diajukan untuk verifikasi moderasi.");
+      if (editingProduct) {
+        const updated = await inventoryService.updateProduct(editingProduct.id, {
+          name,
+          category,
+          price,
+          stock,
+          min_order_quantity: minOrder,
+          unit_type: unitType,
+          image_url: imageUrl || '/assets/fallback-product.png',
+          tiered_pricing: tiers,
+          updated_at: new Date().toISOString()
+        });
+        setProducts(products.map(p => p.id === editingProduct.id ? updated : p));
+        toast.success("Produk berhasil diperbarui.");
+      } else {
+        const newProduct = await inventoryService.createProduct({
+          name,
+          category,
+          description: 'Tidak ada deskripsi yang disediakan.',
+          price,
+          stock,
+          min_order_quantity: minOrder,
+          unit_type: unitType,
+          image_url: imageUrl || '/assets/fallback-product.png',
+          tiered_pricing: tiers,
+          distributor_id: user.id,
+          is_active: true,
+        });
+        setProducts([newProduct, ...products]);
+        toast.success("Produk baru berhasil ditambahkan dan diajukan untuk verifikasi.");
+      }
+      handleCloseModal();
     } catch (err: any) {
-      console.error("Gagal menambahkan produk:", err);
-      toast.error(err.message || "Gagal menambahkan produk.");
+      console.error("Gagal menyimpan produk:", err);
+      toast.error(err.message || "Gagal menyimpan produk.");
     }
   };
 
@@ -125,7 +175,19 @@ export const ProductManagement = () => {
   const lowStockCount = products.filter(p => p.stock < 100).length;
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 w-full max-w-full overflow-hidden px-4 sm:px-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Inventaris</span>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -240,13 +302,22 @@ export const ProductManagement = () => {
                          Memuat produk...
                        </td>
                      </tr>
-                   ) : filteredProducts.length === 0 ? (
-                     <tr>
-                       <td colSpan={5} className="p-6 text-center text-muted-foreground font-bold text-sm">
-                         Produk tidak ditemukan di katalog.
-                       </td>
-                     </tr>
-                   ) : (
+                    ) : products.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-muted-foreground font-bold text-sm space-y-1">
+                          <p>Belum ada produk.</p>
+                          <p className="text-xs text-muted-foreground/75 font-normal">
+                            Tambahkan produk pertama Anda untuk mulai tampil di marketplace setelah moderasi admin.
+                          </p>
+                        </td>
+                      </tr>
+                    ) : filteredProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-muted-foreground font-bold text-sm">
+                          Produk tidak ditemukan di katalog.
+                        </td>
+                      </tr>
+                    ) : (
                      filteredProducts.map((product) => (
                        <motion.tr 
                          key={product.id}
@@ -291,18 +362,26 @@ export const ProductManagement = () => {
                           <td className="p-4">
                              <InventoryStatusBadge status={product.stock > 100 ? 'Active' : product.stock > 0 ? 'Low Stock' : 'Out of Stock'} />
                           </td>
-                          <td className="p-4 text-right">
-                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                                <Button 
-                                  variant="outline" 
-                                  size="icon" 
-                                  className="h-8 w-8 rounded-lg border-border hover:border-rose-500 hover:text-rose-500"
-                                  onClick={() => handleDelete(product.id)}
-                                >
-                                   <Trash2 size={14} />
-                                </Button>
-                             </div>
-                          </td>
+                           <td className="p-4 text-right">
+                              <div className="flex justify-end gap-2 md:opacity-0 md:group-hover:opacity-100 transition-all transform md:translate-x-2 md:group-hover:translate-x-0">
+                                 <Button 
+                                   variant="outline" 
+                                   size="icon" 
+                                   className="h-8 w-8 rounded-lg border-border hover:border-primary hover:text-primary"
+                                   onClick={() => handleEditClick(product)}
+                                 >
+                                    <Edit size={14} />
+                                 </Button>
+                                 <Button 
+                                   variant="outline" 
+                                   size="icon" 
+                                   className="h-8 w-8 rounded-lg border-border hover:border-rose-500 hover:text-rose-500"
+                                   onClick={() => handleDelete(product.id)}
+                                 >
+                                    <Trash2 size={14} />
+                                 </Button>
+                              </div>
+                           </td>
                        </motion.tr>
                      ))
                    )}
@@ -323,7 +402,7 @@ export const ProductManagement = () => {
              exit={{ opacity: 0 }}
              className="fixed inset-0 z-[100] flex items-center justify-center p-6"
            >
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" onClick={() => setIsAddModalOpen(false)} />              <motion.div 
+              <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" onClick={handleCloseModal} />              <motion.div 
                  initial={{ scale: 0.95, y: 15 }}
                  animate={{ scale: 1, y: 0 }}
                  className="relative bg-card border border-border w-full max-w-2xl max-h-[92vh] rounded-2xl shadow-xl flex flex-col overflow-hidden"
@@ -331,10 +410,12 @@ export const ProductManagement = () => {
                   <form onSubmit={handleSave} className="flex flex-col h-full overflow-hidden">
                      <div className="p-5 md:p-6 border-b border-border flex justify-between items-center">
                         <div>
-                           <h2 className="text-lg md:text-xl font-bold tracking-tight">Tambah Produk Baru</h2>
+                           <h2 className="text-lg md:text-xl font-bold tracking-tight">
+                              {editingProduct ? 'Edit Produk' : 'Tambah Produk Baru'}
+                           </h2>
                            <p className="text-muted-foreground text-xs font-medium">Tentukan produk grosir dan tingkatan harga Anda.</p>
                         </div>
-                        <button type="button" onClick={() => setIsAddModalOpen(false)} className="p-2 bg-muted/40 rounded-lg hover:bg-rose-500/10 hover:text-rose-500 transition-all">
+                        <button type="button" onClick={handleCloseModal} className="p-2 bg-muted/40 rounded-lg hover:bg-rose-500/10 hover:text-rose-500 transition-all">
                            <X size={18} />
                         </button>
                      </div>
@@ -415,8 +496,10 @@ export const ProductManagement = () => {
                      </div>
 
                      <div className="p-5 md:p-6 border-t border-border bg-muted/10 flex gap-4">
-                        <Button type="button" variant="ghost" className="h-10 flex-1 rounded-lg font-bold text-sm" onClick={() => setIsAddModalOpen(false)}>Batal</Button>
-                        <Button type="submit" className="h-10 flex-1 rounded-lg bg-primary text-primary-foreground font-bold text-sm shadow-md shadow-primary/30">Simpan Produk</Button>
+                        <Button type="button" variant="ghost" className="h-10 flex-1 rounded-lg font-bold text-sm" onClick={handleCloseModal}>Batal</Button>
+                        <Button type="submit" className="h-10 flex-1 rounded-lg bg-primary text-primary-foreground font-bold text-sm shadow-md shadow-primary/30">
+                           {editingProduct ? 'Perbarui Produk' : 'Simpan Produk'}
+                        </Button>
                      </div>
                   </form>
                </motion.div>

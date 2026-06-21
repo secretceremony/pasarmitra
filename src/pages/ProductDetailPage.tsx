@@ -316,10 +316,29 @@ export function ProductDetailPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 min-w-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <button
+          onClick={() => navigate('/marketplace')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Marketplace
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Detail Produk</span>
+      </div>
+
       {/* Back navigation */}
       <button
         onClick={() => navigate('/marketplace')}
-        className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors group animate-in fade-in slide-in-from-left-4 duration-300"
+        className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors group animate-in fade-in slide-in-from-left-4 duration-300 cursor-pointer"
       >
         <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
         <span>Kembali ke Marketplace</span>

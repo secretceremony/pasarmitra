@@ -26,12 +26,12 @@ export default function Cart() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between w-full">
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
             <button 
-              onClick={() => navigate('/marketplace')} 
+              onClick={() => navigate('/dashboard')} 
               className="hover:text-primary transition-colors cursor-pointer animate-none bg-transparent border-none p-0"
             >
-              Marketplace
+              Dashboard
             </button>
             <span>/</span>
             <span className="text-foreground">Keranjang</span>

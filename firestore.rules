@@ -83,6 +83,16 @@ service cloud.firestore {
       allow read: if isAuthenticated();
     }
 
+    // Wallet Transactions Collection
+    match /wallet_transactions/{txId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Payout Requests Collection
+    match /payout_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // Chat Rooms and Messages (general check)
     match /rooms/{roomId} {
       allow read, write: if isAuthenticated();

@@ -19,7 +19,7 @@ import { cn } from '../../../lib/utils';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCartStore, CartItem } from '../../../store/useCartStore';
 import { useAuthStore } from '../../../store/use-auth-store';
-import { orderService } from '../../orders/services/orderService';
+import { orderService, calculatePlatformFeeRate } from '../../orders/services/orderService';
 import { createAuditLog } from '../../admin/services/adminService';
 import { toast } from 'sonner';
 import { db } from '../../../lib/firebase';
@@ -45,7 +45,7 @@ export const CheckoutWizard = () => {
   // Selection state variables to preserve choices when navigating steps
   const [selectedAddress, setSelectedAddress] = useState(0);
   const [selectedShipping, setSelectedShipping] = useState(0);
-  const [selectedPayment, setSelectedPayment] = useState(0);
+  const [selectedPayment, setSelectedPayment] = useState(-1);
   
   const [searchParams] = useSearchParams();
   const negotiationId = searchParams.get('negotiationId');
@@ -181,10 +181,12 @@ export const CheckoutWizard = () => {
       : 'Alamat Kustom/Tambahan';
       
     const activePaymentMethod = selectedPayment === 0 
-      ? 'Credit Term (30 Days)' 
+      ? 'Bank Transfer (BCA/Mandiri)' 
       : selectedPayment === 1 
-        ? 'Bank Transfer (BCA/Mandiri)' 
-        : 'Balance / Wallet';
+        ? 'QRIS' 
+        : selectedPayment === 2
+          ? 'COD / Bayar di Tempat'
+          : 'Bank Transfer (BCA/Mandiri)';
 
     if (negotiationId) {
       if (!negotiation) {
@@ -225,11 +227,11 @@ export const CheckoutWizard = () => {
       }
 
       // Prepare orders array for batch creation
-      const ordersToCreate = Object.entries(grouped).map(([distId, distItems]) => {
+      const ordersToCreate = await Promise.all(Object.entries(grouped).map(async ([distId, distItems]) => {
         const orderCode = generateOrderCode();
         const orderSubtotal = distItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
         const distributorName = distItems[0].distributor_name || 'Distributor';
-
+ 
         // Prepare order items
         const orderItems = distItems.map((item) => ({
           id: `item-${Math.random().toString(36).substring(7)}`,
@@ -243,7 +245,19 @@ export const CheckoutWizard = () => {
           unit: item.unit_type || 'Unit',
           image_url: item.image_url || ''
         }));
-
+ 
+        const platformFeeRate = await calculatePlatformFeeRate(distId);
+        const platformFeeAmount = Math.round((orderSubtotal * platformFeeRate) / 100);
+        const distributorNetAmount = orderSubtotal - platformFeeAmount;
+ 
+        const mappedPaymentMethod = selectedPayment === 0 
+          ? 'bank_transfer' 
+          : selectedPayment === 1 
+            ? 'qris' 
+            : selectedPayment === 2
+              ? 'cod'
+              : 'manual';
+ 
         const orderData = {
           buyer_id: user.id,
           buyer_name: user.full_name || '',
@@ -254,17 +268,21 @@ export const CheckoutWizard = () => {
           subtotal: orderSubtotal,
           total_amount: orderSubtotal + getShippingCost(),
           shipping_address: activeAddress,
-          payment_status: 'unpaid' as const,
+          payment_status: 'pending' as const,
+          escrow_status: 'none' as const,
           status: 'pending' as const,
-          payment_method: activePaymentMethod,
-          shipping_cost: getShippingCost()
+          payment_method: mappedPaymentMethod,
+          shipping_cost: getShippingCost(),
+          platform_fee_rate: platformFeeRate,
+          platform_fee_amount: platformFeeAmount,
+          distributor_net_amount: distributorNetAmount
         };
-
+ 
         return {
           order_code: orderCode,
           data: orderData
         };
-      });
+      }));
 
       // 2. Perform atomic batch write
       const createdOrders = await orderService.createOrdersBatch(ordersToCreate);
@@ -300,6 +318,10 @@ export const CheckoutWizard = () => {
   };
 
   const handleNext = () => {
+    if (step === 1 && selectedPayment === -1) {
+      toast.error("Pilih metode pembayaran terlebih dahulu.");
+      return;
+    }
     if (step === 2) {
       handlePlaceOrder();
     } else {
@@ -402,6 +424,17 @@ export const CheckoutWizard = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-20 px-4 md:px-0 w-full max-w-full overflow-hidden">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/umkm/cart')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Keranjang
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Checkout</span>
+      </div>
       {/* Explicit Back button in UI */}
       {step < 3 && (
         <Button
@@ -523,34 +556,34 @@ export const CheckoutWizard = () => {
                    exit={{ opacity: 0, x: 20 }}
                    className="space-y-8"
                 >
-                   <h2 className="text-2xl font-black tracking-tight">Payment Method</h2>
-                   <div className="grid gap-4 sm:gap-6">
-                      {[
-                        { name: 'Termin Kredit (30 Hari)', fee: 'Hanya Akun Terverifikasi', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
-                        { name: 'Transfer Bank (BCA/Mandiri)', fee: 'Tanpa biaya', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
-                        { name: 'Saldo / Dompet', fee: 'Instan', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' }
-                      ].map((pay, i) => (
-                        <div 
-                          key={i} 
-                          onClick={() => setSelectedPayment(i)}
-                          className={cn(
-                            "p-4 sm:p-8 border-2 rounded-2xl sm:rounded-[2.5rem] flex items-center justify-between transition-all cursor-pointer duration-300 gap-4",
-                            selectedPayment === i ? "border-primary bg-primary/5 shadow-xl" : "border-border bg-card hover:border-primary/20"
-                          )}
-                        >
-                           <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-                              <div className={cn("w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center font-black transition-all duration-300 shrink-0", selectedPayment === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
-                                 <CreditCard size={20} className="sm:w-7 sm:h-7" />
-                              </div>
-                              <div className="min-w-0">
-                                 <p className="font-black text-sm sm:text-lg truncate">{pay.name}</p>
-                                 <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest truncate">{pay.fee}</p>
-                              </div>
-                           </div>
-                           {selectedPayment === i && <CheckCircle2 size={20} className="text-primary shrink-0 sm:w-6 sm:h-6" />}
-                        </div>
-                      ))}
-                   </div>
+                    <h2 className="text-2xl font-black tracking-tight text-foreground">Metode Pembayaran</h2>
+                    <div className="grid gap-4 sm:gap-6">
+                       {[
+                         { name: 'Transfer Bank (BCA/Mandiri)', desc: 'Bayar melalui transfer rekening setelah pesanan dibuat.', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+                         { name: 'QRIS', desc: 'Bayar menggunakan QRIS untuk proses lebih cepat.', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+                         { name: 'Bayar di Tempat (COD)', desc: 'Pembayaran dilakukan saat barang diterima. Tersedia sesuai kebijakan distributor.', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' }
+                       ].map((pay, i) => (
+                         <div 
+                           key={i} 
+                           onClick={() => setSelectedPayment(i)}
+                           className={cn(
+                             "p-4 sm:p-8 border-2 rounded-2xl sm:rounded-[2.5rem] flex items-center justify-between transition-all cursor-pointer duration-300 gap-4",
+                             selectedPayment === i ? "border-primary bg-primary/5 shadow-xl" : "border-border bg-card hover:border-primary/20"
+                           )}
+                         >
+                            <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+                               <div className={cn("w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center font-black transition-all duration-300 shrink-0", selectedPayment === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                                  <CreditCard size={20} className="sm:w-7 sm:h-7" />
+                               </div>
+                               <div className="min-w-0">
+                                  <p className="font-black text-sm sm:text-lg text-foreground">{pay.name}</p>
+                                  <p className="text-xs font-bold text-muted-foreground leading-normal whitespace-normal mt-1">{pay.desc}</p>
+                               </div>
+                            </div>
+                            {selectedPayment === i && <CheckCircle2 size={20} className="text-primary shrink-0 sm:w-6 sm:h-6" />}
+                         </div>
+                       ))}
+                    </div>
                 </motion.div>
               )}
 
@@ -582,7 +615,7 @@ export const CheckoutWizard = () => {
                              <div className="text-left sm:text-right space-y-1">
                                 <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Metode Pembayaran</p>
                                 <p className="font-bold text-sm sm:text-base">
-                                  {selectedPayment === 0 ? 'Termin Kredit (30 Hari)' : selectedPayment === 1 ? 'Transfer Bank' : 'Saldo / Dompet'}
+                                  {selectedPayment === 0 ? 'Transfer Bank (BCA/Mandiri)' : selectedPayment === 1 ? 'QRIS' : selectedPayment === 2 ? 'Bayar di Tempat (COD)' : 'Belum dipilih'}
                                 </p>
                              </div>
                           </div>

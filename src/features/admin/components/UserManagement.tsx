@@ -576,7 +576,19 @@ export const UserManagement = () => {
   });
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-12 w-full max-w-full overflow-hidden px-4 sm:px-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/admin/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Pengguna</span>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
          <div className="space-y-1 border-l-4 border-primary pl-8 py-2">
             <h1 className="text-2xl sm:text-4xl font-black tracking-tighter">Direktori Pengguna</h1>

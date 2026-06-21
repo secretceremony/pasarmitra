@@ -22,8 +22,10 @@ import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../services/adminService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 export const ModerationSystem = () => {
+  const navigate = useNavigate();
   const [items, setItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('LIST');
@@ -506,7 +508,19 @@ export const ModerationSystem = () => {
   });
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="space-y-6 md:space-y-8 w-full max-w-full overflow-hidden px-4 sm:px-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/admin/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Moderasi</span>
+      </div>
+
       {/* Page Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
          <div className="space-y-1 border-l-4 border-rose-500 pl-6 py-1">

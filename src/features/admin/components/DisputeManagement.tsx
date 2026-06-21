@@ -32,8 +32,10 @@ import { disputeService } from '../../orders/services/disputeService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
 import { formatDateTime } from '../../../lib/dateUtils';
+import { useNavigate } from 'react-router-dom';
 
 export const DisputeManagement = () => {
+  const navigate = useNavigate();
   const [disputes, setDisputes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -281,14 +283,26 @@ export const DisputeManagement = () => {
   const formatDisputeDate = (dispute: any) => formatDateTime(dispute.created_at || dispute.created);
 
   return (
-    <div className="space-y-12">
-      <div className="flex items-center justify-between">
-         <div className="space-y-1 border-l-4 border-[#A35139] pl-8 py-2">
-            <h1 className="text-4xl font-black tracking-tighter">Resolusi Konflik</h1>
-            <p className="text-muted-foreground font-medium">Arbitrase dan mediasi untuk perselisihan transaksi dalam ekosistem PasarMitra.</p>
+    <div className="space-y-12 w-full max-w-full min-w-0 overflow-hidden px-4 sm:px-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/admin/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Sengketa</span>
+      </div>
+
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 min-w-0">
+         <div className="space-y-1 border-l-4 border-[#A35139] pl-4 sm:pl-8 py-2 min-w-0 flex-1">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter break-words">Resolusi Konflik</h1>
+            <p className="text-muted-foreground font-medium text-xs sm:text-sm break-words">Arbitrase dan mediasi untuk perselisihan transaksi dalam ekosistem PasarMitra.</p>
          </div>
-         <div className="flex gap-4">
-            <div className="px-8 py-4 bg-[#A35139]/10 rounded-2xl border border-[#A35139]/20 flex items-center gap-4">
+         <div className="flex gap-4 shrink-0 w-full lg:w-auto">
+            <div className="px-6 py-3 sm:px-8 sm:py-4 bg-[#A35139]/10 rounded-2xl border border-[#A35139]/20 flex items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
                <Scale className="text-[#A35139]" size={28} />
                <div>
                   <p className="text-xs font-black uppercase text-[#A35139] tracking-widest">Tingkat Resolusi</p>
@@ -334,28 +348,30 @@ export const DisputeManagement = () => {
                         key={dispute.id}
                         onClick={() => setSelectedId(dispute.id)}
                         className={cn(
-                          "p-8 bg-card border rounded-[2.5rem] cursor-pointer transition-all hover:scale-[1.01] shadow-xl relative overflow-hidden group",
+                          "p-5 sm:p-8 bg-card border rounded-2xl sm:rounded-[2.5rem] cursor-pointer transition-all hover:scale-[1.01] shadow-xl relative overflow-hidden group w-full min-w-0 max-w-full",
                           selectedId === dispute.id ? "border-[#A35139] ring-2 ring-[#A35139]/20" : "border-border/50 hover:border-[#A35139]/30"
                         )}
                       >
-                         <div className="flex justify-between items-start mb-6">
-                            <StatusBadge 
-                             type={getDisputeStatusType(dispute)} 
-                             label={getDisputeStatusLabel(dispute)} 
-                            />
-                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{dispute.id}</span>
+                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6 min-w-0">
+                            <div className="shrink-0">
+                              <StatusBadge 
+                               type={getDisputeStatusType(dispute)} 
+                               label={getDisputeStatusLabel(dispute)} 
+                              />
+                            </div>
+                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest break-all">{dispute.id}</span>
                          </div>
-                         <div className="space-y-4">
-                            <h4 className="text-xl font-black tracking-tight leading-tight group-hover:text-[#A35139] transition-colors">{dispute.reason}</h4>
-                            <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
-                               <span className="flex items-center gap-1"><User size={12} /> {dispute.claimant || dispute.buyer_name || '-'}</span>
-                               <ArrowRight size={12} className="text-border" />
-                               <span className="flex items-center gap-1"><Building2 size={12} /> {dispute.defendant || dispute.distributor_name || '-'}</span>
+                         <div className="space-y-4 min-w-0">
+                            <h4 className="text-lg sm:text-xl font-black tracking-tight leading-tight group-hover:text-[#A35139] transition-colors break-words">{dispute.reason}</h4>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs font-bold text-muted-foreground min-w-0">
+                               <span className="flex items-center gap-1 min-w-0 truncate"><User size={12} className="shrink-0" /> <span className="truncate">{dispute.claimant || dispute.buyer_name || '-'}</span></span>
+                               <ArrowRight size={12} className="text-border shrink-0 rotate-90 sm:rotate-0" />
+                               <span className="flex items-center gap-1 min-w-0 truncate"><Building2 size={12} className="shrink-0" /> <span className="truncate">{dispute.defendant || dispute.distributor_name || '-'}</span></span>
                             </div>
                          </div>
-                         <div className="flex items-center justify-between mt-8 pt-4 border-t border-border/30">
+                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-6 pt-4 border-t border-border/30 min-w-0">
                             <span className="text-lg font-black italic">{dispute.amount || '-'}</span>
-                            <span className="text-[10px] font-black text-muted-foreground flex items-center gap-2"><Clock size={12} /> {formatDisputeDate(dispute)}</span>
+                            <span className="text-[10px] font-black text-muted-foreground flex items-center gap-2 shrink-0"><Clock size={12} /> {formatDisputeDate(dispute)}</span>
                          </div>
                       </motion.div>
                     ))
@@ -364,27 +380,27 @@ export const DisputeManagement = () => {
          </div>
 
          {/* Arbitration Center */}
-         <div className="lg:col-span-3">
+         <div className="lg:col-span-3 min-w-0 w-full">
             <AnimatePresence mode="wait">
                {selected ? (
                  <motion.div
                     key={selected.id}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-card border border-border/50 rounded-[3.5rem] p-12 shadow-2xl space-y-12 h-fit sticky top-10"
+                    className="bg-card border border-border/50 rounded-2xl sm:rounded-[3.5rem] p-5 sm:p-8 lg:p-12 shadow-2xl space-y-6 sm:space-y-12 h-fit lg:sticky lg:top-10 w-full min-w-0 max-w-full"
                  >
-                    <div className="flex justify-between items-start">
-                       <div className="space-y-4">
-                          <div className="flex items-center gap-4">
-                             <h2 className="text-4xl font-black tracking-tighter">Pusat Arbitrase</h2>
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                       <div className="space-y-2 sm:space-y-4 min-w-0">
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                             <h2 className="text-2xl sm:text-4xl font-black tracking-tighter break-words">Pusat Arbitrase</h2>
                              <StatusBadge 
                                type={getDisputeStatusType(selected)} 
                                label={getDisputeStatusLabel(selected)} 
                              />
                           </div>
-                          <p className="text-muted-foreground font-medium max-w-lg">Penyelidikan atas ketidaksesuaian produk dan kegagalan logistik.</p>
+                          <p className="text-muted-foreground font-medium text-xs sm:text-sm max-w-lg break-words">Penyelidikan atas ketidaksesuaian produk dan kegagalan logistik.</p>
                        </div>
-                       <div className="flex gap-3">
+                       <div className="flex gap-3 shrink-0">
                           <Button variant="outline" className="h-12 w-12 rounded-xl border-border hover:bg-[#A35139]/10 hover:text-[#A35139]">
                              <ShieldAlert size={24} />
                           </Button>
@@ -394,29 +410,29 @@ export const DisputeManagement = () => {
                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-8">
-                       <div className="p-8 bg-muted/20 border border-border/30 rounded-[2.5rem] space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
+                       <div className="p-5 sm:p-8 bg-muted/20 border border-border/30 rounded-2xl sm:rounded-[2.5rem] space-y-4 min-w-0 w-full max-w-full overflow-hidden">
                           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status Penggugat</p>
                           <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary font-black italic animate-pulse-slow">
+                             <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary font-black italic animate-pulse-slow shrink-0">
                                 {selected.claimant || selected.buyer_name ? (selected.claimant || selected.buyer_name)[0] : 'P'}
                              </div>
-                             <div>
-                                <p className="font-black">{selected.claimant || selected.buyer_name || '-'}</p>
-                                <p className="text-xs font-bold text-muted-foreground">Mitra Terverifikasi</p>
+                             <div className="min-w-0">
+                                <p className="font-black text-sm sm:text-base truncate">{selected.claimant || selected.buyer_name || '-'}</p>
+                                <p className="text-xs font-bold text-muted-foreground truncate">Mitra Terverifikasi</p>
                              </div>
                           </div>
                           <Button variant="ghost" className="w-full h-10 bg-white/50 rounded-xl text-[10px] font-black uppercase tracking-widest flex gap-2">Hubungi Penggugat <MessageSquareText size={14} /></Button>
                        </div>
-                       <div className="p-8 bg-muted/20 border border-border/30 rounded-[2.5rem] space-y-4">
+                       <div className="p-5 sm:p-8 bg-muted/20 border border-border/30 rounded-2xl sm:rounded-[2.5rem] space-y-4 min-w-0 w-full max-w-full overflow-hidden">
                           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status Tergugat</p>
                           <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500 font-black italic animate-pulse-slow">
+                             <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500 font-black italic animate-pulse-slow shrink-0">
                                 {selected.defendant || selected.distributor_name ? (selected.defendant || selected.distributor_name)[0] : 'T'}
                              </div>
-                             <div>
-                                <p className="font-black">{selected.defendant || selected.distributor_name || '-'}</p>
-                                <p className="text-xs font-bold text-muted-foreground">Distributor Enterprise</p>
+                             <div className="min-w-0">
+                                <p className="font-black text-sm sm:text-base truncate">{selected.defendant || selected.distributor_name || '-'}</p>
+                                <p className="text-xs font-bold text-muted-foreground truncate">Distributor Enterprise</p>
                              </div>
                           </div>
                           <Button variant="ghost" className="w-full h-10 bg-white/50 rounded-xl text-[10px] font-black uppercase tracking-widest flex gap-2">Hubungi Tergugat <MessageSquareText size={14} /></Button>
@@ -428,23 +444,23 @@ export const DisputeManagement = () => {
                           <AlertCircle className="text-[#A35139]" size={20} />
                           Detail Permasalahan
                        </h3>
-                       <div className="p-8 bg-muted/20 border border-border/30 rounded-[2rem] text-sm font-bold text-muted-foreground space-y-4 leading-relaxed">
+                       <div className="p-5 sm:p-8 bg-muted/20 border border-border/30 rounded-2xl sm:rounded-[2rem] text-xs sm:text-sm font-bold text-muted-foreground space-y-3 sm:space-y-4 leading-relaxed w-full min-w-0 max-w-full break-words">
                           {selected.title && (
-                            <p className="text-foreground">Judul Komplain: <span className="font-black">{selected.title}</span></p>
+                            <p className="text-foreground">Judul Komplain: <span className="font-black break-words">{selected.title}</span></p>
                           )}
-                          <p>Tipe Kendala: <span className="text-foreground font-black">
+                          <p>Tipe Kendala: <span className="text-foreground font-black break-words">
                             {selected.type === 'damaged_item' ? 'Barang Rusak' :
                              selected.type === 'wrong_item' ? 'Barang Tidak Sesuai' :
                              selected.type === 'missing_quantity' ? 'Jumlah Kurang' :
                              selected.type === 'not_received' ? 'Barang Tidak Diterima' :
                              selected.type === 'late_delivery' ? 'Keterlambatan Pengiriman' : 'Lainnya'}
                           </span></p>
-                          <p className="text-foreground">Alasan / Kronologi: {selected.description || selected.reason}</p>
+                          <p className="text-foreground break-words">Alasan / Kronologi: {selected.description || selected.reason}</p>
                           {selected.buyer_notes && (
-                            <p>Catatan Tambahan Pembeli: {selected.buyer_notes}</p>
+                            <p className="break-words">Catatan Tambahan Pembeli: {selected.buyer_notes}</p>
                           )}
                           {selected.requested_resolution && (
-                            <p>Resolusi Diharapkan: <span className="text-[#A35139] capitalize font-black">
+                            <p>Resolusi Diharapkan: <span className="text-[#A35139] capitalize font-black break-words">
                               {selected.requested_resolution === 'full_refund' ? 'Refund Penuh' : 
                                selected.requested_resolution === 'partial_refund' ? 'Refund Sebagian' : 
                                selected.requested_resolution === 'replacement' ? 'Penggantian Barang' : 
@@ -453,10 +469,10 @@ export const DisputeManagement = () => {
                             </span></p>
                           )}
                           {selected.requested_refund_amount ? (
-                            <p>Jumlah Refund Diminta: <span className="text-[#A35139] font-black">Rp {selected.requested_refund_amount.toLocaleString('id-ID')}</span></p>
+                            <p>Jumlah Refund Diminta: <span className="text-[#A35139] font-black break-words">Rp {selected.requested_refund_amount.toLocaleString('id-ID')}</span></p>
                           ) : null}
                           {(selected.order_code || selected.order_id || selected.orderId) && (
-                            <p>ID Pesanan: <span className="text-foreground font-black">#{selected.order_code || selected.order_id || selected.orderId}</span></p>
+                            <p>ID Pesanan: <span className="text-foreground font-black break-all">#{selected.order_code || selected.order_id || selected.orderId}</span></p>
                           )}
                        </div>
                     </div>
@@ -471,7 +487,7 @@ export const DisputeManagement = () => {
                               {selected.evidence_urls && selected.evidence_urls.map((url: string, idx: number) => {
                                 const isImg = url.match(/\.(jpeg|jpg|gif|png)/i) || url.includes('image') || !url.includes('.pdf');
                                 return (
-                                  <div key={idx} className="p-4 bg-muted/20 border border-border/30 rounded-2xl flex flex-col gap-3">
+                                  <div key={idx} className="p-4 bg-muted/20 border border-border/30 rounded-2xl flex flex-col gap-3 min-w-0 w-full max-w-full overflow-hidden">
                                     <div className="flex items-center justify-between gap-4">
                                       <div className="flex items-center gap-2 truncate">
                                         <FileText className="text-primary shrink-0" size={20} />
@@ -487,7 +503,7 @@ export const DisputeManagement = () => {
                                       </a>
                                     </div>
                                     {isImg && (
-                                      <div className="border border-border/30 rounded-xl overflow-hidden aspect-video bg-muted">
+                                      <div className="border border-border/30 rounded-xl overflow-hidden aspect-video bg-muted shrink-0">
                                         <img src={url} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover" />
                                       </div>
                                     )}
@@ -495,7 +511,7 @@ export const DisputeManagement = () => {
                                 );
                               })}
                               {!selected.evidence_urls && selected.evidence_url && (
-                                <div className="p-4 bg-muted/20 border border-border/30 rounded-2xl flex flex-col gap-3 sm:col-span-2">
+                                <div className="p-4 bg-muted/20 border border-border/30 rounded-2xl flex flex-col gap-3 sm:col-span-2 min-w-0 w-full max-w-full overflow-hidden">
                                   <div className="flex items-center justify-between gap-4">
                                     <div className="flex items-center gap-2 truncate">
                                       <FileText className="text-primary shrink-0" size={20} />
@@ -511,7 +527,7 @@ export const DisputeManagement = () => {
                                     </a>
                                   </div>
                                   {selected.evidence_url.match(/\.(jpeg|jpg|gif|png)/i) && (
-                                    <div className="border border-border/30 rounded-xl overflow-hidden max-w-md bg-muted">
+                                    <div className="border border-border/30 rounded-xl overflow-hidden max-w-md bg-muted shrink-0">
                                       <img src={selected.evidence_url} alt="Bukti" className="w-full object-cover" />
                                     </div>
                                   )}
@@ -520,7 +536,7 @@ export const DisputeManagement = () => {
                            </div>
                         </div>
                      ) : (
-                        <div className="p-8 text-center bg-muted/10 border border-dashed border-border/50 rounded-2xl text-xs font-bold text-muted-foreground">
+                        <div className="p-5 sm:p-8 text-center bg-muted/10 border border-dashed border-border/50 rounded-2xl text-xs font-bold text-muted-foreground w-full">
                           Tidak ada lampiran file bukti.
                         </div>
                      )}
@@ -532,7 +548,7 @@ export const DisputeManagement = () => {
                            <Building2 className="text-[#A35139]" size={20} />
                            Respon Distributor
                          </h3>
-                         <div className="p-8 bg-muted/20 border border-border/30 rounded-[2rem] text-sm font-bold text-muted-foreground space-y-4 leading-relaxed text-left">
+                         <div className="p-5 sm:p-8 bg-muted/20 border border-border/30 rounded-2xl sm:rounded-[2rem] text-xs sm:text-sm font-bold text-muted-foreground space-y-3 sm:space-y-4 leading-relaxed text-left w-full min-w-0 max-w-full break-words">
                            <p>
                              Keputusan Distributor: <span className={`inline-block px-2.5 py-0.5 text-[10px] uppercase font-black tracking-wider rounded-full border ${
                                selected.distributor_response.status === 'accepted' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
@@ -544,13 +560,13 @@ export const DisputeManagement = () => {
                                 'Tinjauan Admin'}
                              </span>
                            </p>
-                           <p className="text-foreground">Pesan / Alasan: {selected.distributor_response.message}</p>
-                           <p className="text-[10px] text-muted-foreground font-normal">
+                           <p className="text-foreground break-words">Pesan / Alasan: {selected.distributor_response.message}</p>
+                           <p className="text-[10px] text-muted-foreground font-normal break-words">
                              Ditanggapi oleh: {selected.distributor_response.responded_by} pada {formatDateTime(selected.distributor_response.responded_at)}
                            </p>
 
                            {selected.distributor_response.evidence_urls && selected.distributor_response.evidence_urls.length > 0 && (
-                             <div className="space-y-2 pt-2">
+                             <div className="space-y-2 pt-2 min-w-0 w-full max-w-full">
                                <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-wider">Bukti Distributor</p>
                                <div className="grid grid-cols-2 gap-2">
                                  {selected.distributor_response.evidence_urls.map((url: string, idx: number) => (
@@ -572,41 +588,41 @@ export const DisputeManagement = () => {
                      )}
 
                     {selected.status === 'RESOLVED' ? (
-                       <div className="p-8 bg-emerald-500/10 border border-emerald-500/20 rounded-[2.5rem] space-y-6">
-                          <div className="flex items-center gap-6">
+                       <div className="p-5 sm:p-8 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl sm:rounded-[2.5rem] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full break-words">
+                          <div className="flex items-center gap-4 sm:gap-6 flex-wrap sm:flex-nowrap">
                              <CheckCircle2 className="text-emerald-500 shrink-0" size={32} />
-                             <div>
-                                <p className="font-black text-emerald-500 text-lg">
+                             <div className="min-w-0">
+                                <p className="font-black text-emerald-500 text-base sm:text-lg break-words">
                                   {selected.resolution_type === 'REFUNDED' ? 'Refund Disetujui' : 
                                    selected.resolution_type === 'REJECTED' ? 'Klaim Ditolak' : 'Kasus Selesai'}
                                 </p>
-                                <p className="text-sm text-muted-foreground font-medium">Perselisihan ini telah diselesaikan secara resmi oleh administrator.</p>
+                                <p className="text-xs sm:text-sm text-muted-foreground font-medium break-words">Perselisihan ini telah diselesaikan secara resmi oleh administrator.</p>
                              </div>
                           </div>
                           
-                          <div className="border-t border-emerald-500/20 pt-4 space-y-3 text-sm font-bold text-muted-foreground">
+                          <div className="border-t border-emerald-500/20 pt-4 space-y-3 text-xs sm:text-sm font-bold text-muted-foreground break-words">
                              {selected.resolution_type === 'REFUNDED' && (
                                <>
-                                 <p className="text-foreground">Jumlah Refund: <span className="text-emerald-500 font-black">Rp {(selected.refund_amount || 0).toLocaleString()}</span></p>
-                                 {selected.refund_note && <p>Catatan Refund: {selected.refund_note}</p>}
+                                 <p className="text-foreground break-words">Jumlah Refund: <span className="text-emerald-500 font-black">Rp {(selected.refund_amount || 0).toLocaleString()}</span></p>
+                                 {selected.refund_note && <p className="break-words">Catatan Refund: {selected.refund_note}</p>}
                                </>
                              )}
                              {selected.resolution_type === 'REJECTED' && selected.rejection_reason && (
-                               <p className="text-rose-500">Alasan Penolakan: {selected.rejection_reason}</p>
+                               <p className="text-rose-500 break-words">Alasan Penolakan: {selected.rejection_reason}</p>
                              )}
                              {selected.admin_note && (
-                               <p>Catatan Admin: {selected.admin_note}</p>
+                               <p className="break-words">Catatan Admin: {selected.admin_note}</p>
                              )}
-                             <p className="text-xs text-muted-foreground font-normal">Ditinjau oleh: {selected.reviewed_by || 'Admin'} pada {formatDateTime(selected.reviewed_at)}</p>
+                             <p className="text-[10px] text-muted-foreground font-normal break-words">Ditinjau oleh: {selected.reviewed_by || 'Admin'} pada {formatDateTime(selected.reviewed_at)}</p>
                           </div>
                        </div>
                     ) : (
-                       <div className="space-y-8 pt-8 border-t border-border/30">
-                          <h3 className="text-2xl font-black tracking-tight">Keputusan Akhir</h3>
+                       <div className="space-y-6 sm:space-y-8 pt-6 sm:pt-8 border-t border-border/30">
+                          <h3 className="text-xl sm:text-2xl font-black tracking-tight">Keputusan Akhir</h3>
 
                           {actionType === null ? (
-                             <div className="space-y-6">
-                                <div className="grid md:grid-cols-2 gap-6">
+                             <div className="space-y-4 sm:space-y-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                    <Button 
                                      onClick={() => {
                                        setActionType('refund');
@@ -614,10 +630,10 @@ export const DisputeManagement = () => {
                                        setRefundAmountVal(rawAmount ? rawAmount.toString() : '');
                                        setRefundNoteVal('');
                                      }}
-                                     className="h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg shadow-xl shadow-emerald-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                     className="h-16 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm sm:text-lg shadow-xl shadow-emerald-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
                                      disabled={isProcessing}
                                    >
-                                      <CheckCircle2 size={24} />
+                                      <CheckCircle2 size={24} className="shrink-0" />
                                       Setujui Pengembalian
                                    </Button>
                                    <Button 
@@ -625,23 +641,23 @@ export const DisputeManagement = () => {
                                        setActionType('reject');
                                        setRejectionReasonVal('');
                                      }}
-                                     className="h-16 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-lg shadow-xl shadow-rose-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                     className="h-16 px-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-sm sm:text-lg shadow-xl shadow-rose-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
                                      disabled={isProcessing}
                                    >
-                                      <XCircle size={24} />
+                                      <XCircle size={24} className="shrink-0" />
                                       Tolak Klaim
                                    </Button>
                                 </div>
-                                <div className="grid md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                   <Button 
                                     onClick={() => {
                                       setActionType('replacement');
                                       setAdminNoteVal('');
                                     }}
-                                    className="h-14 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-sm shadow-xl shadow-amber-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                    className="h-14 px-4 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
                                     disabled={isProcessing}
                                   >
-                                     <Package size={20} />
+                                     <Package size={20} className="shrink-0" />
                                      Wajibkan Ganti Barang
                                   </Button>
                                   <Button 
@@ -649,22 +665,22 @@ export const DisputeManagement = () => {
                                       setActionType('mediation');
                                       setAdminNoteVal('');
                                     }}
-                                    className="h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm shadow-xl shadow-blue-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                    className="h-14 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
                                     disabled={isProcessing}
                                   >
-                                     <MessageSquareText size={20} />
+                                     <MessageSquareText size={20} className="shrink-0" />
                                      Lanjut Mediasi
                                   </Button>
                                 </div>
                              </div>
                           ) : actionType === 'refund' ? (
-                             <form onSubmit={handleRefundSubmit} className="p-8 bg-emerald-500/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6">
-                                <h4 className="text-lg font-black text-emerald-500 flex items-center gap-2">
+                             <form onSubmit={handleRefundSubmit} className="p-5 sm:p-8 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl sm:rounded-[2.5rem] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full">
+                                <h4 className="text-base sm:text-lg font-black text-emerald-500 flex items-center gap-2">
                                   <CheckCircle2 size={20} /> Form Persetujuan Refund
                                 </h4>
                                 
                                 <div className="space-y-2">
-                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                     Jumlah Pengembalian Dana (IDR) <span className="text-rose-500">*</span>
                                   </label>
                                   <input 
@@ -678,7 +694,7 @@ export const DisputeManagement = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                     Catatan Persetujuan Refund
                                   </label>
                                   <textarea 
@@ -686,7 +702,7 @@ export const DisputeManagement = () => {
                                     onChange={(e) => setRefundNoteVal(e.target.value)}
                                     placeholder="Jelaskan alasan persetujuan atau catatan transfer dana..."
                                     rows={3}
-                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-4 sm:p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
                                   />
                                 </div>
 
@@ -710,13 +726,13 @@ export const DisputeManagement = () => {
                                 </div>
                              </form>
                           ) : actionType === 'reject' ? (
-                             <form onSubmit={handleRejectSubmit} className="p-8 bg-rose-500/5 border border-rose-500/20 rounded-[2.5rem] space-y-6">
-                                <h4 className="text-lg font-black text-rose-500 flex items-center gap-2">
+                             <form onSubmit={handleRejectSubmit} className="p-5 sm:p-8 bg-rose-500/5 border border-rose-500/20 rounded-2xl sm:rounded-[2.5rem] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full">
+                                <h4 className="text-base sm:text-lg font-black text-rose-500 flex items-center gap-2">
                                   <XCircle size={20} /> Form Penolakan Klaim
                                 </h4>
                                 
                                 <div className="space-y-2">
-                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                     Alasan Penolakan <span className="text-rose-500">*</span>
                                   </label>
                                   <textarea 
@@ -725,7 +741,7 @@ export const DisputeManagement = () => {
                                     onChange={(e) => setRejectionReasonVal(e.target.value)}
                                     placeholder="Jelaskan secara detail mengapa klaim sengketa ditolak..."
                                     rows={4}
-                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-4 sm:p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
                                   />
                                 </div>
 
@@ -749,13 +765,13 @@ export const DisputeManagement = () => {
                                 </div>
                              </form>
                           ) : actionType === 'replacement' ? (
-                             <form onSubmit={handleReplacementSubmit} className="p-8 bg-amber-500/5 border border-amber-500/20 rounded-[2.5rem] space-y-6">
-                                <h4 className="text-lg font-black text-amber-500 flex items-center gap-2">
+                             <form onSubmit={handleReplacementSubmit} className="p-5 sm:p-8 bg-amber-500/5 border border-amber-500/20 rounded-2xl sm:rounded-[2.5rem] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full">
+                                <h4 className="text-base sm:text-lg font-black text-amber-500 flex items-center gap-2">
                                   <Package size={20} /> Form Keputusan Ganti Barang
                                 </h4>
                                 
                                 <div className="space-y-2">
-                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                     Instruksi / Catatan Penggantian Barang <span className="text-rose-500">*</span>
                                   </label>
                                   <textarea 
@@ -764,7 +780,7 @@ export const DisputeManagement = () => {
                                     onChange={(e) => setAdminNoteVal(e.target.value)}
                                     placeholder="Jelaskan instruksi pengembalian barang rusak dan pengiriman produk pengganti..."
                                     rows={4}
-                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-4 sm:p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
                                   />
                                 </div>
 
@@ -788,13 +804,13 @@ export const DisputeManagement = () => {
                                 </div>
                              </form>
                           ) : (
-                             <form onSubmit={handleMediationSubmit} className="p-8 bg-blue-500/5 border border-blue-500/20 rounded-[2.5rem] space-y-6">
-                                <h4 className="text-lg font-black text-blue-500 flex items-center gap-2">
+                             <form onSubmit={handleMediationSubmit} className="p-5 sm:p-8 bg-blue-500/5 border border-blue-500/20 rounded-2xl sm:rounded-[2.5rem] space-y-4 sm:space-y-6 w-full min-w-0 max-w-full">
+                                <h4 className="text-base sm:text-lg font-black text-blue-500 flex items-center gap-2">
                                   <MessageSquareText size={20} /> Transfer ke Mediator Internal
                                 </h4>
                                 
                                 <div className="space-y-2">
-                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                     Catatan Internal Admin / Instruksi Mediasi
                                   </label>
                                   <textarea 
@@ -802,7 +818,7 @@ export const DisputeManagement = () => {
                                     onChange={(e) => setAdminNoteVal(e.target.value)}
                                     placeholder="Tambahkan catatan khusus untuk mediator..."
                                     rows={4}
-                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-4 sm:p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
                                   />
                                 </div>
 
@@ -830,13 +846,13 @@ export const DisputeManagement = () => {
                     )}
                  </motion.div>
                ) : (
-                 <div className="h-[700px] bg-muted/5 border border-dashed border-border/50 rounded-[4rem] flex flex-col items-center justify-center text-center space-y-6">
-                    <div className="w-24 h-24 bg-muted/30 rounded-full flex items-center justify-center text-muted-foreground opacity-30">
-                       <Gavel size={48} />
+                 <div className="h-[300px] sm:h-[600px] bg-muted/5 border border-dashed border-border/50 rounded-2xl sm:rounded-[4rem] flex flex-col items-center justify-center text-center space-y-4 p-6 w-full">
+                    <div className="w-16 h-16 sm:w-24 sm:h-24 bg-muted/30 rounded-full flex items-center justify-center text-muted-foreground opacity-30 shrink-0">
+                       <Gavel size={32} className="sm:size-[48px]" />
                     </div>
-                    <div className="space-y-2">
-                       <h3 className="text-2xl font-black italic">Pilih Kasus</h3>
-                       <p className="text-muted-foreground font-medium max-w-sm px-10">Pilih salah satu sengketa aktif di panel kiri untuk membuka Konsol Arbitrase dan memulai proses penyelidikan.</p>
+                    <div className="space-y-1 sm:space-y-2">
+                       <h3 className="text-xl sm:text-2xl font-black italic">Pilih Kasus</h3>
+                       <p className="text-muted-foreground font-medium text-xs sm:text-sm max-w-sm px-4">Pilih salah satu sengketa aktif di panel kiri untuk membuka Konsol Arbitrase dan memulai proses penyelidikan.</p>
                     </div>
                  </div>
                )}

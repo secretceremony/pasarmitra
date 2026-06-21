@@ -8,6 +8,7 @@ import {
   ShoppingBag, 
   Truck, 
   MapPin, 
+  Coins,
   CreditCard, 
   ShieldCheck,
   ShieldAlert,
@@ -28,7 +29,9 @@ import {
   Wallet,
   Zap,
   ChevronRight,
-  Heart
+  Heart,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useAuthStore } from '../../store/use-auth-store';
 import { useUIStore } from '../../store/use-ui-store';
@@ -60,6 +63,7 @@ const DISTRIBUTOR_NAV_ITEMS = [
   { label: 'Dashboard', href: '/distributor/dashboard', icon: LayoutDashboard },
   { label: 'Inventaris', href: '/inventory', icon: Package },
   { label: 'Pesanan Masuk', href: '/orders', icon: ShoppingBag },
+  { label: 'Saldo & Pencairan', href: '/distributor/wallet', icon: Wallet },
   { label: 'Negosiasi Harga', href: '/distributor/negosiasi-harga', icon: MessageSquareText },
   { label: 'Komplain Masuk', href: '/distributor/disputes', icon: ShieldAlert },
   { label: 'Dokumen Legal', href: '/distributor/legal-docs', icon: ShieldCheck },
@@ -71,12 +75,13 @@ const ADMIN_NAV_ITEMS = [
   { label: 'Verifikasi', href: '/admin/verifications', icon: ShieldCheck },
   { label: 'Moderasi', href: '/admin/moderation', icon: Handshake },
   { label: 'Sengketa', href: '/admin/disputes', icon: ShieldAlert },
+  { label: 'Pencairan Dana', href: '/admin/payouts', icon: Coins },
   { label: 'Log Audit', href: '/admin/audit', icon: Settings },
 ];
 
 export const MainLayout = () => {
   const { user, logout } = useAuthStore();
-  const { sidebarOpen } = useUIStore();
+  const { sidebarOpen, theme, setTheme } = useUIStore();
   const { totalItems } = useCartStore();
   const { notifications } = useNotificationStore();
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -142,7 +147,7 @@ export const MainLayout = () => {
                    "flex items-center gap-4 p-5 rounded-3xl transition-all group relative overflow-hidden",
                    isActive 
                      ? "bg-primary/10 text-primary" 
-                     : "text-sidebar-foreground/40 hover:text-primary hover:bg-primary/5"
+                     : "text-sidebar-foreground/70 hover:text-primary hover:bg-primary/5"
                 )}
               >
                 <item.icon size={24} className={cn(
@@ -151,7 +156,7 @@ export const MainLayout = () => {
                 )} />
                 {sidebarOpen && <span className="font-black text-sm tracking-tight">{item.label}</span>}
                 {isActive && (
-                  <motion.div layoutId="active-nav" className="absolute left-0 w-1.5 h-8 bg-primary rounded-r-xl shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
+                  <motion.div layoutId="active-nav" className="absolute left-0 w-1.5 h-8 bg-primary rounded-r-xl shadow-[0_0_15px_rgba(234,88,12,0.4)]" />
                 )}
               </Link>
             );
@@ -207,7 +212,7 @@ export const MainLayout = () => {
                       )}
                     >
                        <Bell className={cn("w-5 h-5 md:w-6 md:h-6 text-muted-foreground", location.pathname !== "/notifications" && unreadCount > 0 && "animate-bounce")} />
-                       {unreadCount > 0 && <span className="absolute top-2.5 right-2.5 md:top-4 md:right-4 w-2 h-2 md:w-2.5 md:h-2.5 bg-primary rounded-full border-2 border-background shadow-[0_0_10px_rgba(34,197,94,0.3)]" />}
+                       {unreadCount > 0 && <span className="absolute top-2.5 right-2.5 md:top-4 md:right-4 w-2 h-2 md:w-2.5 md:h-2.5 bg-primary rounded-full border-2 border-background shadow-[0_0_10px_rgba(234,88,12,0.4)]" />}
                     </Button>
                   </Link>
                 </div>
@@ -233,6 +238,21 @@ export const MainLayout = () => {
 
               </>
             )}
+
+            {/* Theme Toggle */}
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all relative cursor-pointer"
+              title={theme === 'dark' ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+            >
+               {theme === 'dark' ? (
+                 <Sun className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
+               ) : (
+                 <Moon className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
+               )}
+            </Button>
 
             <div className="h-8 md:h-10 w-px bg-border mx-0.5 md:mx-2 opacity-50" />
 

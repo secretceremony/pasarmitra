@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Plus,
   Trash2,
+  TrendingUp,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -52,6 +53,8 @@ const getPaymentStatusLabel = (status?: string) => {
   switch (status.toLowerCase()) {
     case 'unpaid':
       return 'Belum Dibayar';
+    case 'pending':
+      return 'Menunggu Konfirmasi';
     case 'paid':
       return 'Sudah Dibayar';
     case 'failed':
@@ -60,6 +63,22 @@ const getPaymentStatusLabel = (status?: string) => {
       return 'Dana Dikembalikan (Refunded)';
     default:
       return status;
+  }
+};
+
+const getPaymentMethodLabel = (method?: string) => {
+  if (!method) return 'Escrow Transfer Bank';
+  switch (method.toLowerCase()) {
+    case 'bank_transfer':
+      return 'Transfer Bank (BCA/Mandiri)';
+    case 'qris':
+      return 'QRIS';
+    case 'cod':
+      return 'Bayar di Tempat (COD)';
+    case 'manual':
+      return 'Transfer Bank Manual';
+    default:
+      return method;
   }
 };
 
@@ -85,6 +104,7 @@ export const OrderDetail = () => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [dispute, setDispute] = useState<any | null>(null);
@@ -155,6 +175,21 @@ export const OrderDetail = () => {
       toast.error(err.message || 'Gagal memperbarui status pesanan.');
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!order || isConfirmingPayment) return;
+    try {
+      setIsConfirmingPayment(true);
+      const updated = await orderService.confirmOrderPayment(order.id, user?.email || 'user@pasarmitra.com');
+      setOrder(updated);
+      toast.success("Pembayaran berhasil dikonfirmasi!");
+    } catch (err: any) {
+      console.error("Gagal mengonfirmasi pembayaran:", err);
+      toast.error(err.message || "Gagal mengonfirmasi pembayaran.");
+    } finally {
+      setIsConfirmingPayment(false);
     }
   };
 
@@ -348,6 +383,18 @@ export const OrderDetail = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 pb-16 px-4 sm:px-0 w-full overflow-hidden">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/orders')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Pesanan
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Detail Pesanan</span>
+      </div>
+
       {/* Back navigation */}
       <div className="flex items-center justify-between">
         <button
@@ -579,9 +626,53 @@ export const OrderDetail = () => {
               </h4>
               <div className="flex justify-between items-center text-xs sm:text-sm font-bold">
                 <span className="text-muted-foreground">Pembayaran</span>
-                <span className="text-foreground capitalize">{order.payment_method || 'Escrow Transfer Bank'}</span>
+                <span className="text-foreground">{getPaymentMethodLabel(order.payment_method)}</span>
               </div>
+              
+              {order.escrow_status && (
+                <div className="flex justify-between items-center text-xs sm:text-sm font-bold pt-1">
+                  <span className="text-muted-foreground">Status Escrow</span>
+                  <span className={cn(
+                    "px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-md border",
+                    order.escrow_status === 'released' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                    order.escrow_status === 'held' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                    order.escrow_status === 'refunded' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
+                    'bg-muted text-muted-foreground border-border'
+                  )}>
+                    {
+                      order.escrow_status === 'released' ? 'Dilepas' :
+                      order.escrow_status === 'held' ? 'Ditahan' :
+                      order.escrow_status === 'refunded' ? 'Refunded' :
+                      'Tidak Ada'
+                    }
+                  </span>
+                </div>
+              )}
             </div>
+
+            {/* Financial Details (Distributor & Admin only) */}
+            {(user?.role === 'DISTRIBUTOR' || user?.role === 'ADMIN') && order.platform_fee_rate !== undefined && (
+              <>
+                <hr className="border-border/30" />
+                <div className="space-y-1.5 text-xs sm:text-sm font-bold text-muted-foreground">
+                  <h4 className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                    <TrendingUp size={12} /> Rincian Keuangan
+                  </h4>
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span className="text-foreground font-mono">Rp {(order.subtotal || order.total_amount - (order.shipping_cost || 0)).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Fee Platform ({order.platform_fee_rate}%)</span>
+                    <span className="text-foreground font-mono">Rp {(order.platform_fee_amount || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between pt-1.5 border-t border-dashed border-border/40 text-foreground">
+                    <span>Pendapatan Bersih</span>
+                    <span className="text-primary font-black font-mono">Rp {(order.distributor_net_amount || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Partner Details */}
@@ -615,6 +706,33 @@ export const OrderDetail = () => {
           </div>
 
           {/* Role-based action controls */}
+          {(user?.role === 'UMKM' || user?.role === 'ADMIN') && (order.payment_status === 'pending' || order.payment_status === 'unpaid') && (
+            <div className="p-5 bg-orange-500/5 border border-orange-500/20 rounded-2xl shadow-md space-y-3">
+              <div className="space-y-1">
+                <h4 className="text-xs font-black uppercase text-orange-500 tracking-widest flex items-center gap-1.5">
+                  <CreditCard size={14} /> Konfirmasi Pembayaran
+                </h4>
+                <p className="text-[11px] font-medium text-muted-foreground">
+                  Konfirmasi pembayaran transfer manual untuk pesanan ini.
+                </p>
+              </div>
+              <Button
+                onClick={handleConfirmPayment}
+                disabled={isConfirmingPayment}
+                className="w-full h-10 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-orange-500/10 flex items-center justify-center cursor-pointer"
+              >
+                {isConfirmingPayment ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  'Konfirmasi Pembayaran'
+                )}
+              </Button>
+            </div>
+          )}
+
           {isDistributor && nextStatus ? (
             <div className="p-5 bg-primary/5 border border-primary/20 rounded-2xl shadow-md space-y-3">
               <div className="space-y-1">
@@ -922,7 +1040,7 @@ export const OrderDetail = () => {
                 <div className="p-5 border-b border-border/30 flex justify-between items-center bg-card">
                   <div className="flex items-center gap-2 text-primary">
                     <ShoppingBag size={20} />
-                    <h3 className="text-base font-black tracking-tight">Tulis Ulasan UAT</h3>
+                    <h3 className="text-base font-black tracking-tight">Tulis Ulasan Produk</h3>
                   </div>
                   <button
                     type="button"

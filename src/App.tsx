@@ -30,6 +30,7 @@ import { DistributorVerification } from './features/admin/components/Distributor
 import { ModerationSystem } from './features/admin/components/ModerationSystem';
 import { DisputeManagement } from './features/admin/components/DisputeManagement';
 import { AuditLogSystem } from './features/admin/components/AuditLogSystem';
+import { AdminPayouts } from './features/admin/components/AdminPayouts';
 
 // Distributor Features
 import { ProductManagement } from './features/inventory/components/ProductManagement';
@@ -37,6 +38,7 @@ import { OrderManagement } from './features/orders/components/OrderManagement';
 import { OrderDetail } from './features/orders/components/OrderDetail';
 import { ChatNegotiation } from './features/partners/components/ChatNegotiation';
 import { LegalDocuments } from './features/inventory/components/LegalDocuments';
+import { DistributorWallet } from './features/distributor/components/DistributorWallet';
 
 // Dispute Features
 import { UMKMDisputesList } from './features/orders/components/UMKMDisputesList';
@@ -108,6 +110,7 @@ export default function App() {
                      <Route path="/admin/audit" element={<AuditLogSystem />} />
                      <Route path="/admin/profile" element={<ProfileSettings />} />
                      <Route path="/admin/orders/:orderId" element={<OrderDetail />} />
+                     <Route path="/admin/payouts" element={<AdminPayouts />} />
                    </Route>
                    
                    {/* General Protected Routes */}
@@ -124,6 +127,7 @@ export default function App() {
                      <Route path="/distributor/orders/:orderId" element={<OrderDetail />} />
                      <Route path="/distributor/disputes" element={<DistributorDisputesList />} />
                      <Route path="/distributor/disputes/:disputeId" element={<DistributorDisputeDetail />} />
+                     <Route path="/distributor/wallet" element={<DistributorWallet />} />
                      
                      {/* Redirect removed distributor routes */}
                      <Route path="/distributor/dashboard" element={<Dashboard />} />

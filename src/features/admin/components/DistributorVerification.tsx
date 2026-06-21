@@ -25,9 +25,10 @@ import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
 import { formatDateTime } from '../../../lib/dateUtils';
 
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export const DistributorVerification = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'DISTRIBUTOR' | 'UMKM'>('DISTRIBUTOR');
   const [applications, setApplications] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -427,7 +428,19 @@ export const DistributorVerification = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-hidden px-4 sm:px-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/admin/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Verifikasi</span>
+      </div>
+
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
          <div className="space-y-1 border-l-4 border-amber-500 pl-6 py-1">

@@ -40,7 +40,7 @@ export interface Order {
   total_amount: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shipping_address: string;
-  payment_status: 'unpaid' | 'paid' | 'failed' | 'refunded';
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'unpaid';
   payment_method?: string;
   shipping_cost?: number;
   service_fee?: number; // legacy fee field
@@ -52,7 +52,79 @@ export interface Order {
     organization_name: string;
     email: string;
   };
+  escrow_status?: 'none' | 'held' | 'released' | 'refunded';
+  platform_fee_rate?: number;
+  platform_fee_amount?: number;
+  distributor_net_amount?: number;
+  paid_at?: string;
+  released_at?: string;
 }
+
+export const calculatePlatformFeeRate = async (distributorId: string): Promise<number> => {
+  try {
+    const distSnap = await getDoc(doc(db, 'profiles', distributorId));
+    if (distSnap && typeof distSnap.exists === 'function' && distSnap.exists()) {
+      const distData = distSnap.data();
+      
+      // 1. Check direct configurations
+      if (typeof distData.platform_fee_rate === 'number') {
+        return distData.platform_fee_rate;
+      }
+      if (typeof distData.commission_rate === 'number') {
+        return distData.commission_rate * 100;
+      }
+      
+      // 2. Check assigned tier
+      const tierId = distData.commission_tier || distData.commissionTier;
+      if (tierId) {
+        const tierSnap = await getDoc(doc(db, 'commission_tiers', tierId));
+        if (tierSnap.exists()) {
+          const tierData = tierSnap.data();
+          if (typeof tierData.platformFee === 'number') {
+            return tierData.platformFee;
+          }
+          if (typeof tierData.commission_rate === 'number') {
+            return tierData.commission_rate * 100;
+          }
+        }
+      }
+
+      // 3. Check matching category
+      const distCategory = distData.category || distData.business_category;
+      if (distCategory) {
+        const tiersSnap = await getDocs(collection(db, 'commission_tiers'));
+        let matchedFee: number | null = null;
+        tiersSnap.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.category && data.category.toLowerCase() === distCategory.toLowerCase()) {
+            if (typeof data.platformFee === 'number') {
+              matchedFee = data.platformFee;
+            } else if (typeof data.commission_rate === 'number') {
+              matchedFee = data.commission_rate * 100;
+            }
+          }
+        });
+        if (matchedFee !== null) {
+          return matchedFee;
+        }
+      }
+    }
+
+    // 4. Global baseline
+    const globalDoc = await getDoc(doc(db, 'settings', 'commission'));
+    if (globalDoc.exists()) {
+      const globalData = globalDoc.data();
+      if (typeof globalData.globalBaseline === 'number') {
+        return globalData.globalBaseline;
+      }
+    }
+  } catch (err) {
+    console.error("Error calculating platform fee rate:", err);
+  }
+
+  // 5. Fallback for UAT
+  return 1.5;
+};
 
 export const orderService = {
   getOrderById: async (id: string) => {
@@ -164,9 +236,56 @@ export const orderService = {
     }
 
     const timestamp = new Date().toISOString();
+    
+    // UAT financial flow: Escrow Release on Delivered Order
+    const escrowUpdates: any = {};
+    if (status === 'delivered') {
+      if (currentData.payment_status === 'paid' && currentData.escrow_status !== 'released') {
+        // Query active disputes for this order
+        const disputesSnap = await getDocs(
+          query(collection(db, 'disputes'), where('order_id', '==', id))
+        );
+        const hasActiveDispute = disputesSnap.docs.some(docSnap => {
+          const dStatus = (docSnap.data().status || '').toUpperCase();
+          return dStatus !== 'RESOLVED' && dStatus !== 'REJECTED' && dStatus !== 'REFUNDED';
+        });
+
+        if (!hasActiveDispute) {
+          escrowUpdates.escrow_status = 'released';
+          escrowUpdates.released_at = timestamp;
+
+          // Create wallet transaction with deterministic ID if it does not already exist
+          const txRef = doc(db, 'wallet_transactions', `release_${id}`);
+          const txSnap = await getDoc(txRef);
+          if (!txSnap.exists()) {
+            const gross = currentData.subtotal || currentData.total_amount;
+            const feeRate = currentData.platform_fee_rate ?? 1.5;
+            const feeAmount = currentData.platform_fee_amount ?? Math.round(gross * feeRate / 100);
+            const net = currentData.distributor_net_amount ?? (gross - feeAmount);
+
+            await setDoc(txRef, {
+              id: `release_${id}`,
+              distributor_id: currentData.distributor_id,
+              order_id: id,
+              order_code: currentData.order_code || '',
+              type: 'order_release',
+              direction: 'credit',
+              gross_amount: gross,
+              platform_fee_rate: feeRate,
+              platform_fee_amount: feeAmount,
+              net_amount: net,
+              status: 'completed',
+              created_at: serverTimestamp()
+            });
+          }
+        }
+      }
+    }
+
     await updateDoc(docRef, { 
       status,
-      updated_at: timestamp
+      updated_at: timestamp,
+      ...escrowUpdates
     });
 
     const snap = await getDoc(docRef);
@@ -192,6 +311,36 @@ export const orderService = {
     } as unknown as Order;
   },
 
+  confirmOrderPayment: async (orderId: string, userEmail: string) => {
+    const orderRef = doc(db, 'orders', orderId);
+    const snap = await getDoc(orderRef);
+    if (!snap.exists()) {
+      throw new Error('Order tidak ditemukan');
+    }
+    const timestamp = new Date().toISOString();
+    await updateDoc(orderRef, {
+      payment_status: 'paid',
+      escrow_status: 'held',
+      paid_at: timestamp,
+      updated_at: timestamp
+    });
+
+    await createAuditLog({
+      event: 'ORDER_PAYMENT_CONFIRMED',
+      status: 'SUCCESS',
+      user: userEmail,
+      details: `Konfirmasi pembayaran untuk pesanan: ${snap.data().order_code || orderId}`,
+      targetCollection: 'orders',
+      targetId: orderId
+    });
+
+    const updatedSnap = await getDoc(orderRef);
+    return {
+      id: orderId,
+      ...updatedSnap.data()
+    } as unknown as Order;
+  },
+
   createOrder: async (orderData: Omit<Order, 'id' | 'created_at'>) => {
     // Service-level verification guard
     const buyerDocRef = doc(db, 'profiles', orderData.buyer_id);
@@ -207,10 +356,20 @@ export const orderService = {
       throw new Error('Akun UMKM belum terverifikasi. Silakan ajukan verifikasi terlebih dahulu.');
     }
 
+    const subtotal = orderData.subtotal || orderData.total_amount;
+    const rate = orderData.platform_fee_rate ?? (await calculatePlatformFeeRate(orderData.distributor_id));
+    const amount = orderData.platform_fee_amount ?? Math.round(subtotal * rate / 100);
+    const net = orderData.distributor_net_amount ?? (subtotal - amount);
+
     const timestamp = new Date().toISOString();
     const orderRef = doc(collection(db, 'orders'));
     const newOrder = {
       ...orderData,
+      platform_fee_rate: rate,
+      platform_fee_amount: amount,
+      distributor_net_amount: net,
+      payment_status: orderData.payment_status || 'pending',
+      escrow_status: orderData.escrow_status || 'none',
       created_at: timestamp,
       updated_at: timestamp
     };
@@ -245,8 +404,19 @@ export const orderService = {
 
     for (const item of orders) {
       const orderRef = doc(collection(db, 'orders'));
+      const data = item.data;
+      const subtotal = data.subtotal || data.total_amount;
+      const rate = data.platform_fee_rate ?? (await calculatePlatformFeeRate(data.distributor_id));
+      const amount = data.platform_fee_amount ?? Math.round(subtotal * rate / 100);
+      const net = data.distributor_net_amount ?? (subtotal - amount);
+
       const orderData = {
-        ...item.data,
+        ...data,
+        platform_fee_rate: rate,
+        platform_fee_amount: amount,
+        distributor_net_amount: net,
+        payment_status: data.payment_status || 'pending',
+        escrow_status: data.escrow_status || 'none',
         order_code: item.order_code,
         created_at: timestamp,
         updated_at: timestamp
@@ -364,6 +534,75 @@ export const orderService = {
       created_at: new Date().toISOString(), // local fallback for UI mapping until refresh/realtime
       updated_at: new Date().toISOString()
     };
+  },
+
+  backfillWalletTransactionsForDeliveredOrders: async (distributorId: string) => {
+    try {
+      const q = query(
+        collection(db, 'orders'),
+        where('distributor_id', '==', distributorId),
+        where('status', '==', 'delivered'),
+        where('payment_status', '==', 'paid')
+      );
+      const orderSnap = await getDocs(q);
+      const batch = writeBatch(db);
+      let needCommit = false;
+
+      for (const docSnap of orderSnap.docs) {
+        const orderId = docSnap.id;
+        const orderData = docSnap.data();
+
+        // Check if transaction already exists
+        const txId = `release_${orderId}`;
+        const txRef = doc(db, 'wallet_transactions', txId);
+        const txSnap = await getDoc(txRef);
+
+        if (!txSnap || typeof txSnap.exists !== 'function' || !txSnap.exists()) {
+          const subtotal = orderData.subtotal || orderData.total_amount || 0;
+          let rate = orderData.platform_fee_rate;
+          if (typeof rate !== 'number') {
+            rate = await calculatePlatformFeeRate(distributorId);
+          }
+          const feeAmount = orderData.platform_fee_amount ?? Math.round(subtotal * (rate / 100));
+          const netAmount = orderData.distributor_net_amount ?? (subtotal - feeAmount);
+
+          // Update the order doc
+          const orderRef = doc(db, 'orders', orderId);
+          batch.update(orderRef, {
+            escrow_status: 'released',
+            released_at: orderData.released_at || new Date().toISOString(),
+            platform_fee_rate: rate,
+            platform_fee_amount: feeAmount,
+            distributor_net_amount: netAmount
+          });
+
+          // Create transaction doc
+          batch.set(txRef, {
+            id: txId,
+            order_id: orderId,
+            order_code: orderData.order_code || '',
+            distributor_id: distributorId,
+            gross_amount: subtotal,
+            platform_fee_rate: rate,
+            platform_fee_amount: feeAmount,
+            net_amount: netAmount,
+            direction: 'credit',
+            type: 'order_release',
+            status: 'completed',
+            created_at: serverTimestamp()
+          });
+
+          needCommit = true;
+        }
+      }
+
+      if (needCommit) {
+        await batch.commit();
+        console.log(`[UAT BACKFILL] Successfully backfilled wallet transactions for distributor: ${distributorId}`);
+      }
+    } catch (err) {
+      console.error('Error in backfillWalletTransactionsForDeliveredOrders:', err);
+    }
   }
 };
 

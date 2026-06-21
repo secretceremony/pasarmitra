@@ -40,7 +40,7 @@ export default function Notifications() {
               Dashboard
             </button>
             <span>/</span>
-            <span className="text-foreground">Notifications</span>
+            <span className="text-foreground">Pemberitahuan</span>
           </div>
           <h1 className="text-4xl font-black tracking-tighter">Pemberitahuan</h1>
           <p className="text-muted-foreground font-medium max-w-2xl">
@@ -48,14 +48,6 @@ export default function Notifications() {
           </p>
         </div>
         <div className="flex gap-3 flex-wrap w-full md:w-auto">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/dashboard')}
-            className="h-14 px-6 rounded-2xl border-border bg-card font-black hover:bg-muted transition-all cursor-pointer flex-1 md:flex-initial justify-center"
-          >
-            <ChevronLeft size={20} className="mr-2" />
-            Kembali
-          </Button>
           <Button
             variant="outline"
             onClick={markAllAsRead}
@@ -78,69 +70,70 @@ export default function Notifications() {
       </div>
 
       {/* Notifications Card */}
-      <div className="bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl space-y-6">
-        <div className="flex items-center justify-between border-b border-border/30 pb-6">
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {isLoading ? '— Memuat —' : `${unreadCount} Pesan Belum Dibaca`}
-          </span>
+      {notifications.length === 0 && !isLoading ? (
+        <div className="py-12 flex flex-col items-center justify-center text-center gap-4 opacity-40 bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-8 max-w-md mx-auto shadow-xl">
+          <Bell size={48} strokeWidth={1.5} className="text-muted-foreground" />
+          <div>
+            <p className="font-black text-lg text-foreground">Belum ada pemberitahuan.</p>
+            <p className="text-xs text-muted-foreground mt-1">Semua aktivitas penting akan muncul di sini.</p>
+          </div>
         </div>
+      ) : (
+        <div className="bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl space-y-6">
+          <div className="flex items-center justify-between border-b border-border/30 pb-6">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              {isLoading ? '— Memuat —' : `${unreadCount} Pesan Belum Dibaca`}
+            </span>
+          </div>
 
-        <div className="space-y-4">
-          {/* ── Loading skeleton ── */}
-          {isLoading ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : notifications.length === 0 ? (
-            /* ── Empty state ── */
-            <div className="py-20 flex flex-col items-center justify-center text-center gap-4 opacity-40">
-              <Bell size={64} strokeWidth={1.5} className="text-muted-foreground" />
-              <div>
-                <p className="font-black text-lg text-foreground">Tidak ada pemberitahuan</p>
-                <p className="text-xs text-muted-foreground mt-1">Kotak masuk Anda bersih dan sepi.</p>
-              </div>
-            </div>
-          ) : (
-            /* ── Notification items ── */
-            notifications.map((n) => (
-              <div
-                key={n.id}
-                className={cn(
-                  'p-6 rounded-3xl border transition-all relative flex flex-col sm:flex-row justify-between sm:items-center gap-6 cursor-pointer',
-                  n.is_read
-                    ? 'bg-muted/5 border-border/30 opacity-60'
-                    : 'bg-card border-primary/20 shadow-lg shadow-primary/5'
-                )}
-                onClick={() => markAsRead(n.id)}
-              >
-                <div className="flex gap-4 items-start flex-1">
-                  <div className={cn(
-                    'w-14 h-14 rounded-2xl flex items-center justify-center shrink-0',
-                    n.is_read ? 'bg-muted' : 'bg-primary/10'
-                  )}>
-                    {getIcon(n.type)}
-                  </div>
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <p className="font-black text-base tracking-tight leading-tight flex items-center gap-3">
-                      {n.title}
-                      {!n.is_read && (
-                        <span className="inline-block w-2.5 h-2.5 bg-primary rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)] shrink-0" />
-                      )}
-                    </p>
-                    <p className="text-sm font-medium text-muted-foreground leading-relaxed">{n.message}</p>
-                    <div className="flex items-center gap-2 pt-1 text-[10px] font-bold text-muted-foreground uppercase">
-                      <Clock size={12} />
-                      {new Date(n.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+          <div className="space-y-4">
+            {/* ── Loading skeleton ── */}
+            {isLoading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : (
+              /* ── Notification items ── */
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={cn(
+                    'p-6 rounded-3xl border transition-all relative flex flex-col sm:flex-row justify-between sm:items-center gap-6 cursor-pointer',
+                    n.is_read
+                      ? 'bg-muted/5 border-border/30 opacity-60'
+                      : 'bg-card border-primary/20 shadow-lg shadow-primary/5'
+                  )}
+                  onClick={() => markAsRead(n.id)}
+                >
+                  <div className="flex gap-4 items-start flex-1">
+                    <div className={cn(
+                      'w-14 h-14 rounded-2xl flex items-center justify-center shrink-0',
+                      n.is_read ? 'bg-muted' : 'bg-primary/10'
+                    )}>
+                      {getIcon(n.type)}
+                    </div>
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <p className="font-black text-base tracking-tight leading-tight flex items-center gap-3">
+                        {n.title}
+                        {!n.is_read && (
+                          <span className="inline-block w-2.5 h-2.5 bg-primary rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)] shrink-0" />
+                        )}
+                      </p>
+                      <p className="text-sm font-medium text-muted-foreground leading-relaxed">{n.message}</p>
+                      <div className="flex items-center gap-2 pt-1 text-[10px] font-bold text-muted-foreground uppercase">
+                        <Clock size={12} />
+                        {new Date(n.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

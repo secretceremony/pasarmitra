@@ -15,6 +15,7 @@ import {
 import { db } from '../../../lib/firebase';
 import { createAuditLog } from '../../admin/services/adminService';
 import { UserRole } from '../../auth/types/auth.types';
+import { calculatePlatformFeeRate } from '../../orders/services/orderService';
 
 export interface Message {
   id: string;
@@ -804,7 +805,7 @@ export const negotiationService = {
     // 5. Revalidate distributor status
     const distRef = doc(db, 'profiles', negData.distributor_id);
     const distSnap = await getDoc(distRef);
-    if (!distSnap.exists()) {
+    if (!distSnap || typeof distSnap.exists !== 'function' || !distSnap.exists()) {
       throw new Error('Distributor tidak ditemukan.');
     }
     const distributor = distSnap.data();
@@ -835,6 +836,19 @@ export const negotiationService = {
       image_url: negData.product_image || ''
     }];
 
+    const platformFeeRate = await calculatePlatformFeeRate(negData.distributor_id);
+    const platformFeeAmount = Math.round((totalAmount * platformFeeRate) / 100);
+    const distributorNetAmount = totalAmount - platformFeeAmount;
+
+    // Map payment method to lowercase standard keys for UAT
+    const mappedPaymentMethod = paymentMethod.includes('QRIS') 
+      ? 'qris' 
+      : paymentMethod.includes('COD') 
+        ? 'cod' 
+        : paymentMethod.includes('Transfer') 
+          ? 'bank_transfer' 
+          : 'manual';
+
     const orderData = {
       buyer_id: buyerId,
       buyer_name: buyerName,
@@ -846,12 +860,16 @@ export const negotiationService = {
       subtotal: totalAmount,
       total_amount: totalAmount,
       shipping_address: shippingAddress,
-      payment_status: 'unpaid' as const,
+      payment_status: 'pending' as const,
+      escrow_status: 'none' as const,
       status: 'pending' as const,
-      payment_method: paymentMethod,
+      payment_method: mappedPaymentMethod,
       shipping_cost: 0,
       service_fee: 0,
-      platform_fee: 0,
+      platform_fee: platformFeeAmount,
+      platform_fee_rate: platformFeeRate,
+      platform_fee_amount: platformFeeAmount,
+      distributor_net_amount: distributorNetAmount,
       negotiation_id: negotiationId,
       original_unit_price: negData.original_unit_price,
       agreed_unit_price: agreedPrice,

@@ -9,7 +9,8 @@ import {
   doc, 
   getDoc, 
   deleteDoc,
-  documentId
+  documentId,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
@@ -34,21 +35,30 @@ export interface Product {
   distributor_name?: string;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export const inventoryService = {
+  getProductsByDistributor: async (distributorId: string) => {
+    try {
+      const qSnap = await getDocs(collection(db, 'products'));
+      const products: Product[] = [];
+      qSnap.forEach((doc) => {
+        const data = doc.data();
+        const pId = data.distributor_id || data.distributorId || data.seller_id || data.owner_id || data.created_by;
+        if (pId === distributorId) {
+          products.push({ id: doc.id, ...data } as Product);
+        }
+      });
+      return products.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    } catch (err) {
+      console.error('Error in getProductsByDistributor:', err);
+      return [];
+    }
+  },
+
   getDistributorProducts: async (distributorId: string) => {
-    const q = query(
-      collection(db, 'products'),
-      where('distributor_id', '==', distributorId),
-      orderBy('created_at', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    const products: Product[] = [];
-    querySnapshot.forEach((doc) => {
-      products.push({ id: doc.id, ...doc.data() } as Product);
-    });
-    return products;
+    return inventoryService.getProductsByDistributor(distributorId);
   },
 
   getActiveProducts: async () => {
@@ -126,7 +136,11 @@ export const inventoryService = {
       ...product,
       is_active: false, // Inactive by default until approved
       moderation_status: 'PENDING',
+      distributor_id: product.distributor_id,
       distributor_name: distributorName,
+      created_by: product.distributor_id,
+      owner_id: product.distributor_id,
+      seller_id: product.distributor_id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -169,6 +183,58 @@ export const inventoryService = {
 
   deleteProduct: async (id: string) => {
     await deleteDoc(doc(db, 'products', id));
+  },
+
+  backfillProductDistributorFields: async (distributorId: string) => {
+    try {
+      const distRef = doc(db, 'profiles', distributorId);
+      const distSnap = await getDoc(distRef);
+      if (!distSnap || typeof distSnap.exists !== 'function' || !distSnap.exists()) return;
+      const distData = distSnap.data();
+      const distributorName = distData.organization_name || distData.business_name || distData.full_name || 'Distributor Sembako Utama';
+
+      const demoProductIds = [
+        'demo-product-bimoli',
+        'demo-product-pandan-wangi',
+        'demo-product-gulaku',
+        'demo-product-sariwangi',
+        'demo-product-garam-kapal',
+        'demo-product-beras',
+        'demo-product-gula',
+        'demo-product-teh',
+        'demo-product-garam'
+      ];
+
+      const batch = writeBatch(db);
+      let needCommit = false;
+
+      for (const id of demoProductIds) {
+        const prodRef = doc(db, 'products', id);
+        const prodSnap = await getDoc(prodRef);
+        if (prodSnap && typeof prodSnap.exists === 'function' && prodSnap.exists()) {
+          const data = prodSnap.data();
+          const pId = data.distributor_id || data.distributorId || data.seller_id || data.owner_id;
+
+          if (!pId || pId !== distributorId || !data.distributor_name) {
+            batch.update(prodRef, {
+              distributor_id: distributorId,
+              created_by: distributorId,
+              owner_id: distributorId,
+              seller_id: distributorId,
+              distributor_name: distributorName,
+              updated_at: new Date().toISOString()
+            });
+            needCommit = true;
+          }
+        }
+      }
+
+      if (needCommit) {
+        await batch.commit();
+        console.log('[inventoryService] Demo product owner fields backfilled successfully.');
+      }
+    } catch (err) {
+      console.error('Failed to backfill product distributor fields:', err);
+    }
   }
 };
-

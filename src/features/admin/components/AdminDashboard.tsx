@@ -282,6 +282,12 @@ export const AdminDashboard = () => {
 
   const getReadableEventTitle = (event: string) => {
     const ev = (event || '').toUpperCase();
+    if (ev === 'ORDER_CREATED') {
+      return 'Pesanan dibuat';
+    }
+    if (ev === 'ORDER_PAYMENT_CONFIRMED') {
+      return 'Pembayaran pesanan dikonfirmasi';
+    }
     if (ev.includes('COMMISSION') || ev.includes('KOMISI') || ev === 'KOMISI_BASELINE_REKALIBRASI') {
       return 'Komisi platform diperbarui';
     }
@@ -330,6 +336,11 @@ export const AdminDashboard = () => {
   const getReadableEventDetails = (log: any) => {
     const ev = (log.event || '').toUpperCase();
     let details = log.details || '';
+
+    // Translate details key terms
+    details = details.replace(/Order created:/gi, 'Pesanan dibuat:');
+    details = details.replace(/amount:/gi, 'nominal:');
+    details = details.replace(/distributor:/gi, 'distributor:');
     
     if (ev.includes('COMMISSION') || ev.includes('KOMISI')) {
       const match = details.match(/(\d+\.\d+)/);
@@ -364,13 +375,13 @@ export const AdminDashboard = () => {
   };
 
   return (
-    <div className="space-y-12">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-         <div className="space-y-1 border-l-4 border-[#FFB162] pl-8 py-2">
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tighter">Dashboard Admin PasarMitra</h1>
-            <p className="text-muted-foreground font-medium text-xs sm:text-sm">Pantau operasional marketplace B2B, verifikasi distributor, transaksi, dispute, dan pendapatan platform.</p>
+    <div className="space-y-12 w-full max-w-full min-w-0 overflow-hidden px-4 sm:px-0">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 w-full min-w-0">
+         <div className="space-y-1 border-l-4 border-[#FFB162] pl-4 sm:pl-8 py-2 min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tighter break-words">Dashboard Admin PasarMitra</h1>
+            <p className="text-muted-foreground font-medium text-xs sm:text-sm break-words">Pantau operasional marketplace B2B, verifikasi distributor, transaksi, dispute, dan pendapatan platform.</p>
          </div>
-         <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+         <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto shrink-0">
             <Button 
               variant="outline" 
               className="h-14 px-8 rounded-2xl border-border bg-card font-black flex gap-2 items-center cursor-pointer w-full sm:w-auto justify-center"
@@ -397,7 +408,7 @@ export const AdminDashboard = () => {
       ) : (
         <>
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
              {[
                { 
                  label: 'Total Pengguna', 
@@ -453,7 +464,7 @@ export const AdminDashboard = () => {
                  initial={{ opacity: 0, y: 20 }}
                  animate={{ opacity: 1, y: 0 }}
                  transition={{ delay: i * 0.1 }}
-                 className="bg-card border border-border/50 p-8 rounded-[2.5rem] shadow-xl space-y-4 hover:border-primary/30 transition-all group"
+                 className="bg-card border border-border/50 p-5 sm:p-8 rounded-2xl sm:rounded-[2.5rem] shadow-xl space-y-4 hover:border-primary/30 transition-all group w-full min-w-0 max-w-full overflow-hidden"
                >
                   <div className="flex justify-between items-start">
                      <div className={cn("w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center", stat.color)}>
@@ -476,13 +487,13 @@ export const AdminDashboard = () => {
 
           <div className="grid lg:grid-cols-3 gap-8">
              {/* Main Chart */}
-             <div className="lg:col-span-2 bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-xl space-y-8">
-                <div className="flex justify-between items-center">
-                   <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                      <BarChart3 className="text-primary" />
-                      Volume GMV Transaksi Bulanan
+             <div className="lg:col-span-2 bg-card border border-border/50 rounded-2xl sm:rounded-[3rem] p-4 sm:p-6 lg:p-10 shadow-xl space-y-6 sm:space-y-8 w-full max-w-full min-w-0 overflow-hidden">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                   <h3 className="text-lg sm:text-2xl font-black tracking-tight flex items-center gap-3">
+                      <BarChart3 className="text-primary shrink-0" size={24} />
+                      <span className="break-words">Volume GMV Transaksi Bulanan</span>
                    </h3>
-                   <div className="flex gap-2">
+                   <div className="flex gap-2 shrink-0">
                       <Button variant="ghost" className="h-8 px-4 rounded-full text-[10px] font-black uppercase tracking-widest bg-primary text-primary-foreground">GMV (IDR)</Button>
                    </div>
                 </div>
@@ -496,39 +507,46 @@ export const AdminDashboard = () => {
                       </div>
                    </div>
                 ) : (
-                   <div className="h-[400px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                         <AreaChart data={chartData}>
-                            <defs>
-                               <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#FFB162" stopOpacity={0.1}/>
-                                  <stop offset="95%" stopColor="#FFB162" stopOpacity={0}/>
-                               </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#C9C1B1" opacity={0.2} />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#5C6A7A', fontSize: 12, fontWeight: 700}} />
-                            <YAxis 
-                               axisLine={false} 
-                               tickLine={false} 
-                               tick={{fill: '#5C6A7A', fontSize: 12, fontWeight: 700}} 
-                               tickFormatter={(v) => formatTurnover(v)}
-                            />
-                            <Tooltip 
-                               formatter={(value: any) => [formatTurnover(Number(value)), 'Total Volume']}
-                               contentStyle={{ backgroundColor: '#1B2632', border: 'none', borderRadius: '16px', color: '#EEE9DF' }}
-                               itemStyle={{ color: '#FFB162', fontWeight: 900 }}
-                            />
-                            <Area type="monotone" dataKey="value" stroke="#FFB162" strokeWidth={4} fillOpacity={1} fill="url(#colorValue)" />
-                         </AreaChart>
-                      </ResponsiveContainer>
+                   <div className="w-full">
+                      <div className="overflow-x-auto max-w-full pb-4">
+                         <div className="min-w-[640px] lg:min-w-0 w-full h-[300px] sm:h-[400px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                               <AreaChart data={chartData}>
+                                  <defs>
+                                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#FFB162" stopOpacity={0.1}/>
+                                        <stop offset="95%" stopColor="#FFB162" stopOpacity={0}/>
+                                     </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#C9C1B1" opacity={0.2} />
+                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#5C6A7A', fontSize: 12, fontWeight: 700}} />
+                                  <YAxis 
+                                     axisLine={false} 
+                                     tickLine={false} 
+                                     tick={{fill: '#5C6A7A', fontSize: 12, fontWeight: 700}} 
+                                     tickFormatter={(v) => formatTurnover(v)}
+                                  />
+                                  <Tooltip 
+                                     formatter={(value: any) => [formatTurnover(Number(value)), 'Total Volume']}
+                                     contentStyle={{ backgroundColor: '#1B2632', border: 'none', borderRadius: '16px', color: '#EEE9DF' }}
+                                     itemStyle={{ color: '#FFB162', fontWeight: 900 }}
+                                  />
+                                  <Area type="monotone" dataKey="value" stroke="#FFB162" strokeWidth={4} fillOpacity={1} fill="url(#colorValue)" />
+                               </AreaChart>
+                            </ResponsiveContainer>
+                         </div>
+                      </div>
+                      <p className="block lg:hidden text-[10px] font-black text-center text-muted-foreground uppercase tracking-widest mt-2">
+                        Geser grafik ke samping untuk melihat detail.
+                      </p>
                    </div>
                 )}
              </div>
 
              {/* Side Panel: Ringkasan Operasional */}
-             <div className="bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-xl space-y-8 flex flex-col justify-between">
+             <div className="bg-card border border-border/50 rounded-2xl sm:rounded-[3rem] p-5 sm:p-8 lg:p-10 shadow-xl space-y-6 sm:space-y-8 flex flex-col justify-between w-full min-w-0 max-w-full overflow-hidden">
                 <div>
-                  <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                  <h3 className="text-lg sm:text-2xl font-black tracking-tight flex items-center gap-3">
                      <Globe className="text-primary" />
                      Ringkasan Operasional
                   </h3>
@@ -562,10 +580,10 @@ export const AdminDashboard = () => {
           </div>
 
           {/* Antrian Tindakan Admin Section */}
-          <div className="bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-xl space-y-6">
+          <div className="bg-card border border-border/50 rounded-2xl sm:rounded-[3rem] p-5 sm:p-8 lg:p-10 shadow-xl space-y-6 w-full min-w-0 max-w-full overflow-hidden">
              <div className="flex justify-between items-center flex-wrap gap-4">
                 <div className="space-y-1">
-                   <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                   <h3 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-3">
                       <Scale className="text-primary" />
                       Antrian Tindakan Admin
                    </h3>
@@ -589,7 +607,7 @@ export const AdminDashboard = () => {
                    </div>
                 </div>
              ) : (
-                <div className="overflow-x-auto border border-border/30 rounded-2xl">
+                <div className="overflow-x-auto border border-border/30 rounded-2xl w-full max-w-full min-w-0">
                    <table className="w-full text-left border-collapse font-sans min-w-[700px]">
                       <thead>
                          <tr className="bg-muted/30 border-b border-border/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -631,16 +649,16 @@ export const AdminDashboard = () => {
           </div>
 
           {/* Recent Operational Activity Feed */}
-          <div className="bg-[#1B2632] rounded-[4rem] p-12 text-[#EEE9DF] relative overflow-hidden shadow-3xl">
+          <div className="bg-[#1B2632] rounded-2xl sm:rounded-[3rem] p-5 sm:p-8 lg:p-12 text-[#EEE9DF] relative overflow-hidden shadow-3xl w-full min-w-0 max-w-full">
              <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary/10 to-transparent" />
              <div className="relative z-10 space-y-8">
                 <div className="flex justify-between items-center flex-wrap gap-4">
                    <div className="space-y-1">
-                      <h2 className="text-3xl font-black tracking-tighter leading-tight flex items-center gap-3">
+                      <h2 className="text-xl sm:text-3xl font-black tracking-tighter leading-tight flex items-center gap-3">
                          <History className="text-primary" />
                          Aktivitas Terbaru
                       </h2>
-                      <p className="text-white/60 font-medium text-sm max-w-lg">Jejak aktivitas, pendaftaran, persetujuan produk, dan tindakan administratif platform.</p>
+                      <p className="text-white/60 font-medium text-xs sm:text-sm max-w-lg break-words">Jejak aktivitas, pendaftaran, persetujuan produk, dan tindakan administratif platform.</p>
                    </div>
                    <Button 
                      variant="outline" 
@@ -661,11 +679,11 @@ export const AdminDashboard = () => {
                       </div>
                    ) : (
                       recentLogs.map((log) => (
-                        <div key={log.id} className="p-6 bg-white/5 border border-white/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                           <div className="space-y-1">
-                              <h4 className="text-base font-black text-white">{getReadableEventTitle(log.event)}</h4>
-                              <p className="text-sm font-bold text-white/80">{getReadableEventDetails(log)}</p>
-                              <p className="text-xs text-white/40 font-bold flex items-center gap-1.5 pt-1 flex-wrap">
+                        <div key={log.id} className="p-4 sm:p-6 bg-white/5 border border-white/10 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full min-w-0 max-w-full overflow-hidden">
+                           <div className="space-y-1 min-w-0 w-full flex-1">
+                              <h4 className="text-sm sm:text-base font-black text-white break-words">{getReadableEventTitle(log.event)}</h4>
+                              <p className="text-xs sm:text-sm font-bold text-white/80 break-words whitespace-normal">{getReadableEventDetails(log)}</p>
+                              <p className="text-[10px] sm:text-xs text-white/40 font-bold flex items-center gap-1.5 pt-1 flex-wrap break-all">
                                  {log.user ? (
                                    <a href={`mailto:${log.user}`} className="hover:text-primary transition-colors hover:underline">
                                      {log.user}
@@ -678,7 +696,7 @@ export const AdminDashboard = () => {
                                  <span>{getLogTimestampText(log.timestamp, log.created_at)}</span>
                               </p>
                            </div>
-                           <div className="shrink-0 text-right">
+                           <div className="shrink-0 text-left sm:text-right">
                               <span className={cn(
                                 "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border",
                                 log.status === 'SUCCESS' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"

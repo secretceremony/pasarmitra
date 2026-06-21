@@ -51,6 +51,14 @@ export const updateDisputeStatus = async (
   const disputeData = disputeSnap.data();
   const orderId = disputeData.order_id || disputeData.orderId;
 
+  let orderData: any = null;
+  if (orderId) {
+    const orderSnap = await getDoc(doc(db, 'orders', orderId));
+    if (orderSnap && typeof orderSnap.exists === 'function' && orderSnap.exists()) {
+      orderData = orderSnap.data();
+    }
+  }
+
   const batch = writeBatch(db);
   const now = serverTimestamp();
 
@@ -93,6 +101,35 @@ export const updateDisputeStatus = async (
       orderUpdates.refund_status = 'refunded';
       orderUpdates.payment_status = 'refunded'; // Keep payment status in sync
       
+      // If escrow was already released, we must create a debit refund_adjustment transaction
+      if (orderData && orderData.escrow_status === 'released') {
+        const txRef = doc(db, 'wallet_transactions', `refund_adjust_${orderId}`);
+        const gross = orderData.subtotal || orderData.total_amount;
+        const feeRate = orderData.platform_fee_rate ?? 1.5;
+        const feeAmount = orderData.platform_fee_amount ?? Math.round(gross * feeRate / 100);
+        const net = orderData.distributor_net_amount ?? (gross - feeAmount);
+
+        batch.set(txRef, {
+          id: `refund_adjust_${orderId}`,
+          distributor_id: orderData.distributor_id,
+          order_id: orderId,
+          order_code: orderData.order_code || '',
+          type: 'refund_adjustment',
+          direction: 'debit',
+          gross_amount: gross,
+          platform_fee_rate: feeRate,
+          platform_fee_amount: feeAmount,
+          net_amount: net,
+          status: 'completed',
+          created_at: serverTimestamp()
+        });
+
+        orderUpdates.escrow_status = 'released'; // remains released, but adjusted via ledger
+      } else {
+        // Escrow not released yet, so we mark escrow as refunded and do not credit wallet
+        orderUpdates.escrow_status = 'refunded';
+      }
+      
       auditEvent = 'DISPUTE_REFUNDED';
       auditDetails = `Menyetujui refund sengketa ${disputeId} sebesar ${payload.refund_amount || 0}. Catatan: ${payload.refund_note || ''}`;
       break;
@@ -105,6 +142,33 @@ export const updateDisputeStatus = async (
       
       orderUpdates.dispute_status = 'RESOLVED';
       orderUpdates.refund_status = 'rejected';
+
+      // Check if we should release escrow now (if status is delivered, paid and not released yet)
+      if (orderData && orderData.status === 'delivered' && orderData.payment_status === 'paid' && orderData.escrow_status !== 'released') {
+        orderUpdates.escrow_status = 'released';
+        orderUpdates.released_at = new Date().toISOString();
+
+        const txRef = doc(db, 'wallet_transactions', `release_${orderId}`);
+        const gross = orderData.subtotal || orderData.total_amount;
+        const feeRate = orderData.platform_fee_rate ?? 1.5;
+        const feeAmount = orderData.platform_fee_amount ?? Math.round(gross * feeRate / 100);
+        const net = orderData.distributor_net_amount ?? (gross - feeAmount);
+
+        batch.set(txRef, {
+          id: `release_${orderId}`,
+          distributor_id: orderData.distributor_id,
+          order_id: orderId,
+          order_code: orderData.order_code || '',
+          type: 'order_release',
+          direction: 'credit',
+          gross_amount: gross,
+          platform_fee_rate: feeRate,
+          platform_fee_amount: feeAmount,
+          net_amount: net,
+          status: 'completed',
+          created_at: serverTimestamp()
+        });
+      }
       
       auditEvent = 'DISPUTE_REJECTED';
       auditDetails = `Menolak klaim sengketa ${disputeId}. Alasan: ${payload.rejection_reason || ''}`;
@@ -116,6 +180,33 @@ export const updateDisputeStatus = async (
       disputeUpdates.resolution_type = 'RESOLVED';
       
       orderUpdates.dispute_status = 'RESOLVED';
+
+      // Check if we should release escrow now
+      if (orderData && orderData.status === 'delivered' && orderData.payment_status === 'paid' && orderData.escrow_status !== 'released') {
+        orderUpdates.escrow_status = 'released';
+        orderUpdates.released_at = new Date().toISOString();
+
+        const txRef = doc(db, 'wallet_transactions', `release_${orderId}`);
+        const gross = orderData.subtotal || orderData.total_amount;
+        const feeRate = orderData.platform_fee_rate ?? 1.5;
+        const feeAmount = orderData.platform_fee_amount ?? Math.round(gross * feeRate / 100);
+        const net = orderData.distributor_net_amount ?? (gross - feeAmount);
+
+        batch.set(txRef, {
+          id: `release_${orderId}`,
+          distributor_id: orderData.distributor_id,
+          order_id: orderId,
+          order_code: orderData.order_code || '',
+          type: 'order_release',
+          direction: 'credit',
+          gross_amount: gross,
+          platform_fee_rate: feeRate,
+          platform_fee_amount: feeAmount,
+          net_amount: net,
+          status: 'completed',
+          created_at: serverTimestamp()
+        });
+      }
       
       auditEvent = 'DISPUTE_RESOLVED';
       auditDetails = `Menyelesaikan sengketa ${disputeId} tanpa refund.`;

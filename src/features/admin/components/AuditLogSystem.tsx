@@ -188,19 +188,19 @@ export const AuditLogSystem = () => {
   };
 
   return (
-    <div className="space-y-12 pb-20">
+    <div className="space-y-12 pb-20 w-full max-w-full overflow-hidden px-4 sm:px-0">
       {/* Breadcrumb & Navigation Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
             <button 
               onClick={() => navigate('/admin/dashboard')} 
               className="hover:text-primary transition-colors cursor-pointer"
             >
-              Admin Dashboard
+              Dashboard
             </button>
             <span>/</span>
-            <span className="text-foreground">Audit Log</span>
+            <span className="text-foreground">Log Audit</span>
           </div>
           <h1 className="text-4xl font-black tracking-tighter">Jejak Audit</h1>
           <p className="text-muted-foreground font-medium max-w-2xl">

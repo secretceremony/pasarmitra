@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { profileService } from '../services/profileService';
-import { db } from '../../../lib/firebase';
+import { db, auth } from '../../../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { updatePassword } from 'firebase/auth';
 
 import { UserRole, UserProfile } from '../types/auth.types';
 import { toast } from 'sonner';
@@ -27,6 +28,13 @@ import { Button } from '../../../components/ui/button';
 
 export const ProfileSettings = () => {
   const { user, setUser } = useAuthStore();
+  const navigate = useNavigate();
+
+  const getDynamicTitle = () => {
+    if (user?.role === 'ADMIN') return 'Profil Admin';
+    if (user?.role === 'DISTRIBUTOR') return 'Profil Distributor';
+    return 'Profil UMKM';
+  };
 
 
   const [isLoading, setIsLoading] = useState(true);
@@ -56,6 +64,11 @@ export const ProfileSettings = () => {
   const [distVerificationPhone, setDistVerificationPhone] = useState('');
   const [distBusinessDocumentUrl, setDistBusinessDocumentUrl] = useState('');
   const [isSubmittingDistVerification, setIsSubmittingDistVerification] = useState(false);
+
+  // Password Update States
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Fetch real profile data on mount
   useEffect(() => {
@@ -339,8 +352,58 @@ export const ProfileSettings = () => {
     );
   }
 
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword) {
+      toast.error('Kata sandi baru tidak boleh kosong.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Konfirmasi kata sandi tidak cocok.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('Kata sandi minimal harus 6 karakter.');
+      return;
+    }
+
+    try {
+      setIsUpdatingPassword(true);
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await updatePassword(currentUser, newPassword);
+        toast.success('Kata sandi berhasil diperbarui.');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.error('Pengguna tidak terautentikasi.');
+      }
+    } catch (err: any) {
+      console.error('Gagal memperbarui kata sandi:', err);
+      if (err.code === 'auth/requires-recent-login') {
+        toast.error('Untuk alasan keamanan, Anda harus login kembali sebelum mengubah kata sandi.');
+      } else {
+        toast.error(err.message || 'Gagal memperbarui kata sandi.');
+      }
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
   return (
-    <div className="space-y-10 pb-20">
+    <div className="space-y-10 pb-20 w-full max-w-full overflow-hidden px-4 sm:px-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate(getDashboardPath())}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">{getDynamicTitle()}</span>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2">
@@ -350,7 +413,7 @@ export const ProfileSettings = () => {
                 <ArrowLeft size={16} />
               </Button>
             </Link>
-            <h1 className="text-4xl font-black tracking-tighter">Profil & Pengaturan</h1>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tighter">{getDynamicTitle()}</h1>
           </div>
           <p className="text-muted-foreground font-medium text-lg ml-14">
             Kelola informasi akun, data bisnis, dan pengaturan keamanan Anda.
@@ -360,7 +423,7 @@ export const ProfileSettings = () => {
 
       {/* Distributor Verification Panel — replaces amber banner */}
       {user.role === UserRole.DISTRIBUTOR && (
-        <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-8 shadow-xl">
+        <div className="bg-card border border-border/50 rounded-[2.5rem] p-6 sm:p-10 space-y-8 shadow-xl">
           <h3 className="text-2xl font-black tracking-tight flex items-center gap-3 border-b border-border/30 pb-4">
             <ShieldCheck className="text-primary" size={24} />
             Verifikasi Usaha Distributor
@@ -521,7 +584,7 @@ export const ProfileSettings = () => {
       <form onSubmit={handleSave} className="grid lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-10">
           {/* Card 1: Account Information */}
-          <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-8 shadow-xl">
+          <div className="bg-card border border-border/50 rounded-[2.5rem] p-6 sm:p-10 space-y-8 shadow-xl">
             <h3 className="text-2xl font-black tracking-tight flex items-center gap-3 border-b border-border/30 pb-4">
               <User className="text-primary" size={24} />
               Informasi Akun
@@ -589,9 +652,9 @@ export const ProfileSettings = () => {
             </div>
           </div>
 
-          {/* Card 2: Business/Store Information (Distributor and UMKM only) */}
+           {/* Card 2: Business/Store Information (Distributor and UMKM only) */}
           {(user.role === UserRole.DISTRIBUTOR || user.role === UserRole.UMKM) && (
-            <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-8 shadow-xl">
+            <div className="bg-card border border-border/50 rounded-[2.5rem] p-6 sm:p-10 space-y-8 shadow-xl">
               <h3 className="text-2xl font-black tracking-tight flex items-center gap-3 border-b border-border/30 pb-4">
                 <Building2 className="text-primary" size={24} />
                 {user.role === UserRole.DISTRIBUTOR ? 'Informasi Bisnis Distribusi' : 'Informasi Toko / UMKM'}
@@ -672,9 +735,9 @@ export const ProfileSettings = () => {
             </div>
           )}
 
-          {/* Card: UMKM Verification */}
+           {/* Card: UMKM Verification */}
           {user.role === UserRole.UMKM && (
-            <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-8 shadow-xl">
+            <div className="bg-card border border-border/50 rounded-[2.5rem] p-6 sm:p-10 space-y-8 shadow-xl">
               <h3 className="text-2xl font-black tracking-tight flex items-center gap-3 border-b border-border/30 pb-4">
                 <ShieldCheck className="text-primary" size={24} />
                 Verifikasi Usaha UMKM
@@ -854,8 +917,8 @@ export const ProfileSettings = () => {
 
         {/* Sidebar Panel: Security & Account Status */}
         <div className="space-y-10">
-          {/* Card 3: Account Status */}
-          <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-6 shadow-xl">
+           {/* Card 3: Account Status */}
+          <div className="bg-card border border-border/50 rounded-[2.5rem] p-6 sm:p-10 space-y-6 shadow-xl">
             <h3 className="text-xl font-black tracking-tight border-b border-border/30 pb-3 flex items-center gap-2">
               <ShieldCheck className="text-primary" size={20} />
               Status Akun
@@ -901,40 +964,49 @@ export const ProfileSettings = () => {
               )}
             </div>
           </div>
-
-          {/* Card 4: Password Security (Disabled for UAT) */}
-          <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-6 shadow-xl">
+          <div className="bg-card border border-border/50 rounded-[2.5rem] p-6 sm:p-10 space-y-6 shadow-xl">
             <h3 className="text-xl font-black tracking-tight border-b border-border/30 pb-3 flex items-center gap-2">
               <Lock className="text-primary" size={20} />
               Keamanan Akun
             </h3>
 
             <div className="space-y-4">
-              <div className="space-y-2 opacity-50 cursor-not-allowed">
+              <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kata Sandi Baru</label>
                 <input
                   type="password"
-                  disabled
-                  placeholder="••••••••"
-                  className="w-full h-12 bg-muted/10 border border-border/20 rounded-xl px-4 text-sm font-bold cursor-not-allowed"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Masukkan kata sandi baru"
+                  className="w-full h-12 bg-background border border-border rounded-xl px-4 text-sm font-bold text-foreground focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
-              <div className="space-y-2 opacity-50 cursor-not-allowed">
+              <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Konfirmasi Kata Sandi</label>
                 <input
                   type="password"
-                  disabled
-                  placeholder="••••••••"
-                  className="w-full h-12 bg-muted/10 border border-border/20 rounded-xl px-4 text-sm font-bold cursor-not-allowed"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Ulangi kata sandi baru"
+                  className="w-full h-12 bg-background border border-border rounded-xl px-4 text-sm font-bold text-foreground focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
               
-              <div className="p-4 bg-muted/20 border border-border/40 rounded-2xl flex items-start gap-3">
-                <Lock className="text-muted-foreground shrink-0 mt-0.5" size={16} />
-                <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  Fitur pembaruan kata sandi dinonaktifkan untuk UAT. Gunakan opsi "Lupa Sandi" di halaman masuk untuk mengatur ulang.
-                </p>
-              </div>
+              <Button
+                type="button"
+                onClick={handleUpdatePassword}
+                disabled={isUpdatingPassword}
+                className="w-full bg-primary text-primary-foreground font-black text-xs uppercase tracking-wider h-11 rounded-xl shadow-lg shadow-primary/10 flex items-center justify-center"
+              >
+                {isUpdatingPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memperbarui...
+                  </>
+                ) : (
+                  'Perbarui Kata Sandi'
+                )}
+              </Button>
             </div>
           </div>
 

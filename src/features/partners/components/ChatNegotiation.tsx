@@ -282,7 +282,20 @@ export const ChatNegotiation = () => {
   };
 
   return (
-    <div className="h-auto lg:h-[calc(100vh-160px)] flex flex-col lg:flex-row gap-6 lg:gap-8 w-full max-w-full overflow-hidden px-4 lg:px-0">
+    <div className="space-y-4 w-full">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Negosiasi Harga</span>
+      </div>
+
+      <div className="h-auto lg:h-[calc(100vh-160px)] flex flex-col lg:flex-row gap-6 lg:gap-8 w-full max-w-full overflow-hidden px-4 lg:px-0">
       
       {/* 1. Left Panel - Rooms list */}
       <div className={cn("w-full lg:w-96 flex flex-col gap-4 shrink-0 h-full", activeNegId ? "hidden lg:flex" : "flex")}>
@@ -805,6 +818,7 @@ export const ChatNegotiation = () => {
         .custom-scrollbar::-webkit-scrollbar { width: 0px; height: 0px; }
         .custom-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
       `}} />
+    </div>
     </div>
   );
 };

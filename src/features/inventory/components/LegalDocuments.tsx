@@ -22,9 +22,13 @@ import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../../admin/services/adminService';
 import { toast } from 'sonner';
 import { authService } from '../../auth/services/auth.service';
+import { useNavigate } from 'react-router-dom';
+
 
 export const LegalDocuments = () => {
   const { user, setUser } = useAuthStore();
+  const navigate = useNavigate();
+
 
   // Form Fields State
   const [companyName, setCompanyName] = useState('');
@@ -180,23 +184,35 @@ export const LegalDocuments = () => {
   const vStatus = user?.is_verified ? 'VERIFIED' : (user?.verification_status || 'NOT_SUBMITTED');
 
   return (
-    <div className="space-y-12 pb-20 max-w-6xl">
+    <div className="space-y-12 pb-20 max-w-6xl w-full max-w-full overflow-hidden px-4 sm:px-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider flex-wrap min-w-0">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="hover:text-primary transition-colors cursor-pointer"
+        >
+          Dashboard
+        </button>
+        <span>/</span>
+        <span className="text-foreground">Dokumen Legal</span>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 py-6 border-b-2 border-border/50">
         <div className="space-y-2">
            <div className="flex items-center gap-3 text-primary">
               <ShieldCheck size={28} />
-              <span className="text-xs font-black uppercase tracking-[0.3em]">Compliance & Onboarding</span>
+              <span className="text-xs font-black uppercase tracking-[0.3em]">Verifikasi & Onboarding</span>
            </div>
-           <h1 className="text-4xl font-black tracking-tighter">Legal Compliance Portfolio</h1>
-           <p className="text-muted-foreground font-medium text-lg">Maintain your verification status to access premium enterprise deals.</p>
+           <h1 className="text-3xl sm:text-4xl font-black tracking-tighter">Portofolio Dokumen Legal</h1>
+           <p className="text-muted-foreground font-medium text-base sm:text-lg">Jaga status verifikasi usaha Anda agar dapat mengakses fitur penuh PasarMitra.</p>
         </div>
         <div className="p-6 md:p-8 bg-primary/5 border border-primary/20 rounded-[2.5rem] flex items-center gap-6">
            <div className="w-14 h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-2xl shadow-xl shadow-primary/20">
               {getComplianceScore()}
            </div>
            <div>
-              <p className="text-xs font-black text-primary uppercase tracking-widest">Compliance Status</p>
+              <p className="text-xs font-black text-primary uppercase tracking-widest">Status Verifikasi</p>
               <p className="text-lg font-black tracking-tight text-foreground">{getComplianceTier()}</p>
            </div>
         </div>
@@ -214,24 +230,24 @@ export const LegalDocuments = () => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="p-10 bg-amber-500/5 border border-amber-500/20 rounded-[3rem] space-y-6 shadow-xl"
+                  className="p-6 sm:p-10 bg-amber-500/5 border border-amber-500/20 rounded-[3rem] space-y-6 shadow-xl"
                 >
                    <div className="flex items-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center animate-pulse">
                          <Clock size={28} />
                       </div>
                       <div>
-                         <h3 className="text-2xl font-black tracking-tight text-amber-800">Dokumen Sedang Ditinjau</h3>
-                         <p className="text-sm font-semibold text-amber-700/80">Pengajuan verifikasi Anda sedang diperiksa oleh tim admin.</p>
+                         <h3 className="text-2xl font-black tracking-tight text-amber-800 dark:text-amber-400">Dokumen Sedang Ditinjau</h3>
+                         <p className="text-sm font-semibold text-amber-700/80 dark:text-amber-300/85">Pengajuan verifikasi Anda sedang diperiksa oleh tim admin.</p>
                       </div>
                    </div>
 
-                   <div className="border-t border-amber-500/10 pt-6 space-y-4 text-sm font-bold text-amber-800/80 leading-relaxed">
+                   <div className="border-t border-amber-500/10 pt-6 space-y-4 text-sm font-bold text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
                       <p>
                          Terima kasih atas kesabaran Anda. Kami sedang memverifikasi NIB dan NPWP yang Anda kirimkan untuk menjamin keamanan transaksi di ekosistem PasarMitra. Proses verifikasi biasanya memakan waktu 2-4 jam kerja.
                       </p>
                       {vStatus === 'ESCALATED' && (
-                        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex gap-3 text-amber-800">
+                        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex gap-3 text-amber-800 dark:text-amber-300">
                           <AlertTriangle className="shrink-0 text-amber-600" />
                           <p className="text-xs font-black uppercase tracking-wide">Status: Pengajuan Dieskalasi ke Tim Legal untuk validasi khusus.</p>
                         </div>
@@ -269,19 +285,19 @@ export const LegalDocuments = () => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="p-10 bg-emerald-500/5 border border-emerald-500/20 rounded-[3rem] space-y-6 shadow-xl"
+                  className="p-6 sm:p-10 bg-emerald-500/5 border border-emerald-500/20 rounded-[3rem] space-y-6 shadow-xl"
                 >
                    <div className="flex items-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
                          <CheckCircle2 size={28} />
                       </div>
                       <div>
-                         <h3 className="text-2xl font-black tracking-tight text-emerald-800">Verifikasi Terpenuhi</h3>
-                         <p className="text-sm font-semibold text-emerald-700/80">Akun distributor Anda berstatus aktif dan terverifikasi.</p>
+                         <h3 className="text-2xl font-black tracking-tight text-emerald-800 dark:text-emerald-300">Verifikasi Terpenuhi</h3>
+                         <p className="text-sm font-semibold text-emerald-700/80 dark:text-emerald-200/80">Akun distributor Anda berstatus aktif dan terverifikasi.</p>
                       </div>
                    </div>
 
-                   <div className="border-t border-emerald-500/10 pt-6 space-y-4 text-sm font-bold text-emerald-800/80 leading-relaxed">
+                    <div className="border-t border-emerald-500/10 pt-6 space-y-4 text-sm font-bold text-emerald-800/80 dark:text-emerald-200/80 leading-relaxed">
                       <p>
                          Selamat! Dokumen compliance Anda telah diverifikasi oleh sistem. Anda sekarang memiliki hak akses penuh untuk menerbitkan katalog produk grosir, bernegosiasi harga, dan melakukan transaksi termin kredit secara resmi di PasarMitra.
                       </p>
@@ -318,22 +334,22 @@ export const LegalDocuments = () => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="p-10 bg-rose-500/5 border border-rose-500/20 rounded-[3rem] space-y-6 shadow-xl"
+                  className="p-6 sm:p-10 bg-rose-500/5 border border-rose-500/20 rounded-[3rem] space-y-6 shadow-xl"
                 >
                    <div className="flex items-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-600 flex items-center justify-center">
                          <AlertCircle size={28} />
                       </div>
                       <div>
-                         <h3 className="text-2xl font-black tracking-tight text-rose-800">Verifikasi Ditolak</h3>
-                         <p className="text-sm font-semibold text-rose-700/80">Dokumen legalitas ditolak karena alasan ketidaksesuaian data.</p>
+                         <h3 className="text-2xl font-black tracking-tight text-rose-800 dark:text-rose-300">Verifikasi Ditolak</h3>
+                         <p className="text-sm font-semibold text-rose-700/80 dark:text-rose-200/80">Dokumen legalitas ditolak karena alasan ketidaksesuaian data.</p>
                       </div>
                    </div>
 
-                   <div className="border-t border-rose-500/10 pt-6 space-y-4 text-sm font-bold text-rose-800/80 leading-relaxed">
+                   <div className="border-t border-rose-500/10 pt-6 space-y-4 text-sm font-bold text-rose-800/80 dark:text-rose-200/80 leading-relaxed">
                       <div className="p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
-                         <p className="text-xs font-black text-rose-800 uppercase tracking-widest mb-1.5 flex items-center gap-1"><AlertCircle size={14} /> Alasan Penolakan Admin:</p>
-                         <p className="font-bold text-sm text-rose-700">{user?.rejection_reason || user?.audit_note || "Dokumen yang dilampirkan tidak sesuai, atau nomor identitas salah."}</p>
+                         <p className="text-xs font-black text-rose-800 dark:text-rose-300 uppercase tracking-widest mb-1.5 flex items-center gap-1"><AlertCircle size={14} /> Alasan Penolakan Admin:</p>
+                         <p className="font-bold text-sm text-rose-700 dark:text-rose-300">{user?.rejection_reason || user?.audit_note || "Dokumen yang dilampirkan tidak sesuai, atau nomor identitas salah."}</p>
                       </div>
                       <p>
                          Silakan ajukan kembali verifikasi Anda dengan memeriksa keabsahan dokumen legalitas perusahaan. Pastikan nomor NIB dan NPWP yang ditulis sesuai dan tidak dalam kondisi kedaluwarsa.
@@ -479,7 +495,7 @@ export const LegalDocuments = () => {
 
         {/* Sidebar Info Panel */}
         <div className="space-y-8">
-           <div className="p-10 bg-[#06110B] border border-primary/20 rounded-[3.5rem] shadow-2xl space-y-8 relative overflow-hidden">
+           <div className="p-6 sm:p-10 bg-[#06110B] border border-primary/20 rounded-[3.5rem] shadow-2xl space-y-8 relative overflow-hidden">
               <div className="relative z-10 space-y-6">
                  <div className="w-14 h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20">
                     <ShieldCheck size={28} />

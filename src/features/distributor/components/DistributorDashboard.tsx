@@ -51,6 +51,17 @@ const NEGOTIATION_STATUS_LABELS: Record<string, string> = {
   checked_out: 'Selesai'
 };
 
+const ACTIVE_NEGOTIATION_STATUSES = [
+  'open',
+  'waiting_distributor',
+  'waiting_buyer',
+  'countered',
+  'pending',
+];
+
+const isActiveNegotiation = (status?: string) =>
+  ACTIVE_NEGOTIATION_STATUSES.includes((status || '').toLowerCase());
+
 export const DistributorDashboard = () => {
   const { user } = useAuthStore();
 
@@ -154,7 +165,7 @@ export const DistributorDashboard = () => {
 
         // Filter active/open negotiations
         const openList = list.filter(
-          (neg) => neg.status !== 'cancelled' && neg.status !== 'converted_to_order'
+          (neg) => isActiveNegotiation(neg.status)
         );
 
         setNegotiations(openList.slice(0, 3));
@@ -277,8 +288,8 @@ export const DistributorDashboard = () => {
 
           {/* Recent Incoming Orders */}
           <div className="bg-card border border-border/50 rounded-3xl p-6 space-y-5 min-w-0 overflow-hidden">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="text-xl font-black tracking-tight truncate">Pesanan Masuk Terbaru</h3>
+            <div className="flex flex-row items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+              <h3 className="text-xl font-black tracking-tight">Pesanan Masuk Terbaru</h3>
               <Link to="/orders" className="shrink-0">
                 <Button variant="link" className="text-primary font-bold px-0">Lihat Semua</Button>
               </Link>
@@ -303,51 +314,53 @@ export const DistributorDashboard = () => {
                   <motion.div
                     key={order.id}
                     whileHover={{ x: 2 }}
-                    className="flex items-center gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl group hover:border-primary/30 hover:bg-primary/5 transition-all min-w-0 overflow-hidden"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl group hover:border-primary/30 hover:bg-primary/5 transition-all min-w-0"
                   >
-                    {/* Status icon */}
-                    <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                      order.status === 'Pending'    ? "bg-amber-500/15 text-amber-500" :
-                      order.status === 'Processing' ? "bg-blue-500/15 text-blue-500"   :
-                      order.status === 'Shipped'    ? "bg-violet-500/15 text-violet-500" :
-                      "bg-emerald-500/15 text-emerald-500"
-                    )}>
-                      <ShoppingBag size={18} />
-                    </div>
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {/* Status icon */}
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
+                        order.status === 'Pending'    ? "bg-amber-500/15 text-amber-500" :
+                        order.status === 'Processing' ? "bg-blue-500/15 text-blue-500"   :
+                        order.status === 'Shipped'    ? "bg-violet-500/15 text-violet-500" :
+                        "bg-emerald-500/15 text-emerald-500"
+                      )}>
+                        <ShoppingBag size={18} />
+                      </div>
 
-                    {/* Order info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-sm leading-tight truncate">
-                        {order.buyer || 'Tanpa Nama'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-[10px] font-bold text-muted-foreground font-mono truncate max-w-[120px]">
-                          #{typeof order.id === 'string' ? order.id.slice(0, 10) : order.id}
-                        </span>
-                        <span className="text-muted-foreground/30 text-xs">•</span>
-                        <span className="text-xs font-black text-primary shrink-0">{order.amount}</span>
-                        <span className="text-muted-foreground/30 text-xs">•</span>
-                        <span className="text-[10px] text-muted-foreground shrink-0">{order.time}</span>
+                      {/* Order info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-sm leading-tight text-foreground break-words">
+                          {order.buyer || 'Tanpa Nama'}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="text-[10px] font-bold text-muted-foreground font-mono break-all">
+                            #{typeof order.id === 'string' ? order.id.slice(0, 10) : order.id}
+                          </span>
+                          <span className="text-muted-foreground/30 text-xs">•</span>
+                          <span className="text-xs font-black text-primary shrink-0">{order.amount}</span>
+                          <span className="text-muted-foreground/30 text-xs">•</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">{order.time}</span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Status badge + action */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-row items-center justify-between sm:justify-end gap-3 shrink-0 w-full sm:w-auto border-t sm:border-t-0 border-border/20 pt-3 sm:pt-0">
                       <span className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider hidden sm:inline-flex",
+                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                         order.status === 'Pending'    ? "bg-amber-500/20 text-amber-600" :
                         order.status === 'Processing' ? "bg-blue-500/20 text-blue-600"   :
                         order.status === 'Shipped'    ? "bg-violet-500/20 text-violet-600" :
                         "bg-emerald-500/20 text-emerald-600"
                       )}>
-                        {order.status}
+                        {order.status === 'Pending' ? 'Menunggu' : order.status === 'Processing' ? 'Diproses' : order.status === 'Shipped' ? 'Dikirim' : 'Selesai'}
                       </span>
                       <Link to="/orders">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="rounded-lg h-8 px-3 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="rounded-lg h-8 px-3 text-xs font-bold md:opacity-0 md:group-hover:opacity-100 transition-opacity whitespace-nowrap cursor-pointer"
                         >
                           Proses
                         </Button>
@@ -397,8 +410,7 @@ export const DistributorDashboard = () => {
                 <div className="flex flex-col items-center justify-center py-10 gap-3 text-center bg-muted/10 border border-dashed border-border/50 rounded-2xl w-full">
                   <MessageSquareText size={28} className="text-muted-foreground/30" />
                   <p className="text-sm font-bold text-muted-foreground">
-                    Tidak ada negosiasi aktif.<br />
-                    <span className="font-normal text-xs">Penawaran baru dari UMKM akan muncul di sini.</span>
+                    Tidak ada negosiasi aktif saat ini.
                   </p>
                 </div>
               ) : (
