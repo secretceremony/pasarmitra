@@ -70,6 +70,27 @@ export const reviewService = {
     };
 
     const docRef = await addDoc(collection(db, 'reviews'), newReview);
+
+    // Send notification to the distributor
+    try {
+      let productName = 'Produk Anda';
+      const prodSnap = await getDoc(doc(db, 'products', reviewData.product_id));
+      if (prodSnap.exists()) {
+        productName = prodSnap.data().name || 'Produk Anda';
+      }
+
+      await addDoc(collection(db, 'notifications'), {
+        user_id: reviewData.distributor_id,
+        title: 'Ulasan Baru Diterima',
+        message: `Pembeli ${reviewData.buyer_name} memberikan ulasan Bintang ${reviewData.rating} untuk produk ${productName}.`,
+        type: 'info',
+        is_read: false,
+        created_at: timestamp
+      });
+    } catch (e) {
+      console.error('Error creating review notification for distributor:', e);
+    }
+
     return { ...newReview, id: docRef.id };
   },
 

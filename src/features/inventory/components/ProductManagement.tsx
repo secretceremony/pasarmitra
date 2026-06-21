@@ -18,12 +18,16 @@ import { InventoryStatusBadge } from './InventoryStatusBadge';
 import { StockIndicator } from './StockIndicator';
 import { inventoryService, Product } from '../services/inventoryService';
 import { useAuthStore } from '../../../store/use-auth-store';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export const ProductManagement = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const editProductId = queryParams.get('edit');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -70,6 +74,15 @@ export const ProductManagement = () => {
   useEffect(() => {
     fetchProducts();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (editProductId && products.length > 0) {
+      const target = products.find(p => p.id === editProductId);
+      if (target) {
+        handleEditClick(target);
+      }
+    }
+  }, [editProductId, products]);
 
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
@@ -192,17 +205,9 @@ export const ProductManagement = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Manajemen Inventaris</h1>
-          <p className="text-muted-foreground font-medium text-xs sm:text-sm">Tambah, perbarui, dan kelola katalog produk grosir Anda.</p>
+          <p className="text-muted-foreground font-medium text-xs sm:text-sm">Perbarui dan kelola katalog produk grosir Anda.</p>
         </div>
-        <Button 
-          onClick={() => setIsAddModalOpen(true)}
-          disabled={!user?.is_verified}
-          className="h-10 px-5 rounded-lg bg-primary text-primary-foreground font-bold text-sm shadow-md shadow-primary/20 hover:scale-102 transition-transform disabled:opacity-50 disabled:hover:scale-100"
-          title={!user?.is_verified ? 'Lengkapi verifikasi legalitas usaha Anda untuk menambah produk' : 'Tambah produk baru'}
-        >
-          <Plus size={18} className="mr-1.5" />
-          Tambah Produk Baru
-        </Button>
+        {/* Tambah Produk Baru disabled as per business policy (Distributor cannot add new items) */}
       </div>
 
       {/* Alert Banner for Unverified Distributors */}

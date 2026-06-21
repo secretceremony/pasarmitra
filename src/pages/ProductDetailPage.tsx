@@ -15,7 +15,8 @@ import {
   Store,
   MapPin,
   Minus,
-  Plus
+  Plus,
+  Edit
 } from 'lucide-react';
 import { useAuthStore } from '../store/use-auth-store';
 import { useCartStore, AddItemResult } from '../store/useCartStore';
@@ -180,7 +181,9 @@ export function ProductDetailPage() {
     e.preventDefault();
     if (!user || !product) return;
 
-    const finalReason = selectedReasonOption === 'Lainnya' ? customReasonText.trim() : selectedReasonOption;
+    const finalReason = selectedReasonOption === 'Lainnya'
+      ? customReasonText.trim()
+      : (customReasonText.trim() ? `${selectedReasonOption}: ${customReasonText.trim()}` : selectedReasonOption);
     if (!finalReason) {
       toast.error("Alasan laporan wajib diisi.");
       return;
@@ -303,6 +306,7 @@ export function ProductDetailPage() {
   const canReportProduct = user && user.role === 'UMKM';
   const canReportReview = (rev: ProductReview) => {
     if (!user) return false;
+    if (rev.buyer_id === user.id) return false; // Cannot report own review
     if (user.role === 'UMKM') return true;
     if (user.role === 'DISTRIBUTOR') {
       return product.distributor_id === user.id;
@@ -521,6 +525,19 @@ export function ProductDetailPage() {
             </div>
           )}
 
+          {/* Edit Product button for the owner distributor */}
+          {user?.role === 'DISTRIBUTOR' && product.distributor_id === user.id && (
+            <div className="border-t border-border/30 pt-6">
+              <Button 
+                onClick={() => navigate(`/inventory?edit=${product.id}`)}
+                className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-black text-sm shadow-xl shadow-primary/20 cursor-pointer flex gap-2 items-center justify-center"
+              >
+                <Edit size={18} className="shrink-0" />
+                Edit Produk Ini
+              </Button>
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -675,15 +692,15 @@ export function ProductDetailPage() {
                 </select>
               </div>
 
-              {selectedReasonOption === 'Lainnya' && (
+              {selectedReasonOption && (
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">
-                    Detail Alasan Lainnya <span className="text-rose-500">*</span>
+                    Keterangan Tambahan {selectedReasonOption === 'Lainnya' ? <span className="text-rose-500">*</span> : '(Opsional)'}
                   </label>
                   <textarea
-                    required
+                    required={selectedReasonOption === 'Lainnya'}
                     rows={3}
-                    placeholder="Tuliskan alasan lengkap laporan Anda di sini..."
+                    placeholder={selectedReasonOption === 'Lainnya' ? "Tuliskan alasan lengkap laporan Anda di sini..." : "Berikan keterangan tambahan jika ada..."}
                     value={customReasonText}
                     onChange={(e) => setCustomReasonText(e.target.value)}
                     disabled={isSubmittingReport}

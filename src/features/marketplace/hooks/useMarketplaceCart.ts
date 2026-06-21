@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useCartStore, AddItemResult } from '../../../store/useCartStore';
 import { useNotificationStore } from '../../../store/useNotificationStore';
+import { useAuthStore } from '../../../store/use-auth-store';
 import { MarketplaceProduct } from '../types/product.types';
 import { ProductSummary } from '../../../core/types/commerce';
 import { toast } from 'sonner';
@@ -8,8 +9,13 @@ import { toast } from 'sonner';
 export function useMarketplaceCart() {
   const { addItem } = useCartStore();
   const { addNotification } = useNotificationStore();
+  const { user } = useAuthStore();
 
   const handleAddToCart = useCallback((product: MarketplaceProduct) => {
+    if (user?.role !== 'UMKM') {
+      toast.error("Hanya akun UMKM yang dapat berbelanja dan menambah produk ke keranjang.");
+      return;
+    }
     const result = addItem({
       id: product.id,
       name: product.name,
@@ -43,6 +49,10 @@ export function useMarketplaceCart() {
   }, [addItem, addNotification]);
 
   const handleQuickAdd = useCallback((product: ProductSummary) => {
+    if (user?.role !== 'UMKM') {
+      toast.error("Hanya akun UMKM yang dapat berbelanja dan menambah produk ke keranjang.");
+      return;
+    }
     const result = addItem({
       id: product.id,
       name: product.name,

@@ -61,6 +61,7 @@ const UMKM_NAV_ITEMS = [
 
 const DISTRIBUTOR_NAV_ITEMS = [
   { label: 'Dashboard', href: '/distributor/dashboard', icon: LayoutDashboard },
+  { label: 'Marketplace', href: '/marketplace', icon: Store },
   { label: 'Inventaris', href: '/inventory', icon: Package },
   { label: 'Pesanan Masuk', href: '/orders', icon: ShoppingBag },
   { label: 'Saldo & Pencairan', href: '/distributor/wallet', icon: Wallet },

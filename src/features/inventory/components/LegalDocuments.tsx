@@ -166,6 +166,30 @@ export const LegalDocuments = () => {
     }
   };
 
+  const getEstimationTime = () => {
+    try {
+      const submittedAt = user?.legal_info?.submitted_at || user?.updated_at;
+      if (!submittedAt) return '2-4 jam kerja';
+      
+      const date = new Date(submittedAt);
+      if (isNaN(date.getTime())) return '2-4 jam kerja';
+
+      const minEst = new Date(date.getTime() + 2 * 60 * 60 * 1000);
+      const maxEst = new Date(date.getTime() + 4 * 60 * 60 * 1000);
+
+      const formatTime = (d: Date) => {
+        return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
+      };
+      const formatDate = (d: Date) => {
+        return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      };
+
+      return `${formatDate(minEst)} antara pukul ${formatTime(minEst)} - ${formatTime(maxEst)}`;
+    } catch (e) {
+      return '2-4 jam kerja';
+    }
+  };
+
   const getComplianceScore = () => {
     if (user?.is_verified) return '100%';
     if (user?.verification_status === 'PENDING_REVIEW') return '75%';
@@ -243,9 +267,15 @@ export const LegalDocuments = () => {
                    </div>
 
                    <div className="border-t border-amber-500/10 pt-6 space-y-4 text-sm font-bold text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
-                      <p>
-                         Terima kasih atas kesabaran Anda. Kami sedang memverifikasi NIB dan NPWP yang Anda kirimkan untuk menjamin keamanan transaksi di ekosistem PasarMitra. Proses verifikasi biasanya memakan waktu 2-4 jam kerja.
-                      </p>
+                       <p>
+                          Terima kasih atas kesabaran Anda. Kami sedang memverifikasi NIB dan NPWP yang Anda kirimkan untuk menjamin keamanan transaksi di ekosistem PasarMitra. Proses verifikasi biasanya memakan waktu 2-4 jam kerja.
+                       </p>
+                       <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3 text-amber-800 dark:text-amber-300">
+                          <Clock size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                          <p className="text-xs font-bold leading-normal">
+                             <strong>Estimasi Selesai Peninjauan:</strong> {getEstimationTime()}
+                          </p>
+                       </div>
                       {vStatus === 'ESCALATED' && (
                         <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex gap-3 text-amber-800 dark:text-amber-300">
                           <AlertTriangle className="shrink-0 text-amber-600" />

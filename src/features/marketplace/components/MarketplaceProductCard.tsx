@@ -4,6 +4,7 @@ import { ShieldCheck, Plus } from "lucide-react";
 import { ReputationBadge } from "../../../components/common/ReputationBadge";
 import { MarketplaceProduct } from "../types/product.types";
 import { Button } from "../../../components/ui/button";
+import { useAuthStore } from "../../../store/use-auth-store";
 import { 
   SUPPLIER_TIER_CONFIG, 
   MARKETPLACE_UI_STRINGS, 
@@ -19,6 +20,7 @@ interface MarketplaceProductCardProps {
 }
 
 export function MarketplaceProductCard({ product, onAddToCart, onDistributorClick, onNegotiate, onViewDetails }: MarketplaceProductCardProps) {
+  const { user } = useAuthStore();
   const tier = SUPPLIER_TIER_CONFIG.GOLD;
 
   return (
@@ -47,13 +49,15 @@ export function MarketplaceProductCard({ product, onAddToCart, onDistributorClic
             </div>
          </div>
          
-         <button 
-          onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
-          className="absolute bottom-3 right-3 w-10 h-10 bg-primary text-primary-foreground rounded-xl items-center justify-center shadow-lg hover:scale-105 active:scale-95 shadow-primary/20 cursor-pointer hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20"
-          title="Tambah ke Keranjang"
-         >
-            <Plus size={18} />
-         </button>
+         {user?.role === 'UMKM' && (
+           <button 
+            onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
+            className="absolute bottom-3 right-3 w-10 h-10 bg-primary text-primary-foreground rounded-xl items-center justify-center shadow-lg hover:scale-105 active:scale-95 shadow-primary/20 cursor-pointer hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20"
+            title="Tambah ke Keranjang"
+           >
+              <Plus size={18} />
+           </button>
+         )}
       </div>
 
       <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3 min-w-0">
@@ -65,7 +69,12 @@ export function MarketplaceProductCard({ product, onAddToCart, onDistributorClic
                >
                   {product.distributor}
                </button>
-               <ReputationBadge score={product.rating} size="sm" className="shrink-0" />
+                <div className="flex items-center gap-1.5 shrink-0">
+                   <ReputationBadge score={product.rating} size="sm" />
+                   {product.reviewCount !== undefined && product.reviewCount > 0 && (
+                      <span className="text-[9px] font-bold text-muted-foreground">({product.reviewCount})</span>
+                   )}
+                </div>
             </div>
             <h3 
               className="font-black text-lg sm:text-xl line-clamp-2 break-words text-foreground group-hover:text-primary transition-colors leading-snug"
@@ -94,13 +103,15 @@ export function MarketplaceProductCard({ product, onAddToCart, onDistributorClic
             </div>
 
             <div className="space-y-2 min-w-0">
-               <Button 
-                 className="w-full h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 font-black text-xs uppercase tracking-wider cursor-pointer md:hidden flex items-center justify-center gap-1.5"
-                 onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
-               >
-                 <Plus size={16} />
-                 Tambah ke Keranjang
-               </Button>
+               {user?.role === 'UMKM' && (
+                  <Button 
+                    className="w-full h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 font-black text-xs uppercase tracking-wider cursor-pointer md:hidden flex items-center justify-center gap-1.5"
+                    onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
+                  >
+                    <Plus size={16} />
+                    Tambah ke Keranjang
+                  </Button>
+               )}
 
                {onNegotiate && (
                   <Button 

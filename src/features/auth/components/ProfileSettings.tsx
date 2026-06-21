@@ -21,7 +21,9 @@ import {
   AlertTriangle,
   Lock,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 
@@ -69,6 +71,8 @@ export const ProfileSettings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Fetch real profile data on mount
   useEffect(() => {
@@ -973,23 +977,41 @@ export const ProfileSettings = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kata Sandi Baru</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Masukkan kata sandi baru"
-                  className="w-full h-12 bg-background border border-border rounded-xl px-4 text-sm font-bold text-foreground focus:outline-none focus:border-primary transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Masukkan kata sandi baru"
+                    className="w-full h-12 bg-background border border-border rounded-xl pl-4 pr-12 text-sm font-bold text-foreground focus:outline-none focus:border-primary transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Konfirmasi Kata Sandi</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Ulangi kata sandi baru"
-                  className="w-full h-12 bg-background border border-border rounded-xl px-4 text-sm font-bold text-foreground focus:outline-none focus:border-primary transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Ulangi kata sandi baru"
+                    className="w-full h-12 bg-background border border-border rounded-xl pl-4 pr-12 text-sm font-bold text-foreground focus:outline-none focus:border-primary transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               
               <Button

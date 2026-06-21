@@ -82,9 +82,12 @@ export default function App() {
                    <Route path="/distributor/:id" element={<DistributorProfile />} />
                    <Route path="/my-partners" element={<Navigate to="/dashboard" replace />} />
                    
+                   {/* General Marketplace & Product Detail Routes (Accessible by UMKM, Distributor, Admin) */}
+                   <Route path="/marketplace" element={<Marketplace />} />
+                   <Route path="/umkm/products/:productId" element={<ProductDetailPage />} />
+
                    {/* UMKM Only Routes */}
                    <Route element={<ProtectedRoute allowedRoles={[UserRole.UMKM]} />}>
-                      <Route path="/marketplace" element={<Marketplace />} />
                       <Route path="/checkout" element={<CheckoutWizard />} />
                       <Route path="/umkm/cart" element={<Cart />} />
                       <Route path="/umkm/dashboard" element={<Dashboard />} />
@@ -94,7 +97,6 @@ export default function App() {
                       <Route path="/umkm/orders/:orderId" element={<OrderDetail />} />
                       <Route path="/umkm/disputes" element={<UMKMDisputesList />} />
                       <Route path="/umkm/disputes/:disputeId" element={<UMKMDisputeDetail />} />
-                      <Route path="/umkm/products/:productId" element={<ProductDetailPage />} />
                    </Route>
                    
                    {/* Admin Only Routes */}

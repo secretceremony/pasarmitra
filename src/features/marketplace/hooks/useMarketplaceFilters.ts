@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 import { MarketplaceProduct } from '../types/product.types';
 import { inventoryService } from '../../inventory/services/inventoryService';
 import { CATEGORIES } from '../data/categories';
@@ -49,19 +51,43 @@ export function useMarketplaceFilters() {
       setError(null);
       const activeProducts = await inventoryService.getActiveProducts();
       
-      const mapped: MarketplaceProduct[] = activeProducts.map(p => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        category: p.category,
-        image: p.image_url || '/assets/fallback-product.png',
-        rating: 4.7, // Default rating fallback
-        bulk: `${p.min_order_quantity} ${p.unit_type}`,
-        unit: p.unit_type,
-        distributor: p.distributor_name || 'Distributor',
-        distributorId: p.distributor_id,
-        stock: p.stock
-      }));
+      // Fetch all reviews to compute average ratings in memory
+      const reviewsSnap = await getDocs(collection(db, 'reviews'));
+      const reviewMap: Record<string, { total: number; count: number }> = {};
+      reviewsSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const pId = data.product_id;
+        const rating = Number(data.rating || 0);
+        if (pId && rating > 0) {
+          if (!reviewMap[pId]) {
+            reviewMap[pId] = { total: 0, count: 0 };
+          }
+          reviewMap[pId].total += rating;
+          reviewMap[pId].count += 1;
+        }
+      });
+
+      const mapped: MarketplaceProduct[] = activeProducts.map(p => {
+        const reviewData = reviewMap[p.id];
+        // Calculate average rating or default to 5.0
+        const rating = reviewData ? Number((reviewData.total / reviewData.count).toFixed(1)) : 5.0;
+        const count = reviewData ? reviewData.count : 0;
+        
+        return {
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          category: p.category,
+          image: p.image_url || '/assets/fallback-product.png',
+          rating: rating,
+          reviewCount: count,
+          bulk: `${p.min_order_quantity} ${p.unit_type}`,
+          unit: p.unit_type,
+          distributor: p.distributor_name || 'Distributor',
+          distributorId: p.distributor_id,
+          stock: p.stock
+        };
+      });
       
       setProducts(mapped);
     } catch (err) {
