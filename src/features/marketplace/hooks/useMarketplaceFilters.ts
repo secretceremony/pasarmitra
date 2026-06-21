@@ -54,7 +54,7 @@ export function useMarketplaceFilters() {
         name: p.name,
         price: p.price,
         category: p.category,
-        image: p.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400',
+        image: p.image_url || '/assets/fallback-product.png',
         rating: 4.7, // Default rating fallback
         bulk: `${p.min_order_quantity} ${p.unit_type}`,
         unit: p.unit_type,

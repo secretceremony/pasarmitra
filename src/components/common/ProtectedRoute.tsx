@@ -27,7 +27,11 @@ export const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+    let dashboardPath = '/umkm/dashboard';
+    if (user.role === UserRole.ADMIN) dashboardPath = '/admin/dashboard';
+    else if (user.role === UserRole.DISTRIBUTOR) dashboardPath = '/distributor/dashboard';
+    
+    return <Navigate to={dashboardPath} replace />;
   }
 
   return <Outlet />;

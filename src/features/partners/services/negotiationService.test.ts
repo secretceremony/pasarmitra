@@ -13,7 +13,10 @@ import {
 } from 'firebase/firestore';
 import { createAuditLog } from '../../admin/services/adminService';
 
-// Mock firebase/firestore
+const mockUpdate = vi.fn();
+const mockSet = vi.fn();
+const mockCommit = vi.fn().mockResolvedValue(undefined);
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(),
   query: vi.fn(),
@@ -25,6 +28,12 @@ vi.mock('firebase/firestore', () => ({
   addDoc: vi.fn(),
   setDoc: vi.fn(),
   getDocs: vi.fn(),
+  serverTimestamp: vi.fn(() => 'mock-timestamp'),
+  writeBatch: vi.fn(() => ({
+    update: mockUpdate,
+    set: mockSet,
+    commit: mockCommit
+  }))
 }));
 
 // Mock the firebase db client
@@ -59,6 +68,11 @@ describe('negotiationService', () => {
         data: () => mockProduct
       } as any);
 
+      // Mock check for existing active negotiation room
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        forEach: (callback: any) => {}
+      } as any);
+
       vi.mocked(addDoc)
         .mockResolvedValueOnce({ id: 'neg-123' } as any) // addDoc for negotiation
         .mockResolvedValueOnce({ id: 'msg-123' } as any); // addDoc for message
@@ -75,8 +89,8 @@ describe('negotiationService', () => {
       expect(result.id).toBe('neg-123');
       expect(result.requested_unit_price).toBe(32000);
       expect(result.quantity).toBe(10);
-      expect(result.status).toBe('pending');
-      expect(addDoc).toHaveBeenCalledTimes(2);
+      expect(result.status).toBe('waiting_distributor');
+      expect(addDoc).toHaveBeenCalledTimes(3);
       expect(createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
         event: 'NEGOTIATION_CREATED',
         status: 'SUCCESS'
@@ -203,27 +217,33 @@ describe('negotiationService', () => {
         .mockResolvedValueOnce({ exists: () => true, data: () => mockNeg } as any) // neg snap
         .mockResolvedValueOnce({ exists: () => true, data: () => mockProduct } as any); // product snap
 
+      // Mock query messages snap (for expiring pending offers)
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        forEach: (callback: any) => {}
+      } as any);
+
       await negotiationService.counterOffer(
         'neg-123',
         'dist-123',
         'DISTRIBUTOR',
+        'Super Distributor',
         33000,
         15,
         'Tawaran balik distributor'
       );
 
-      expect(updateDoc).toHaveBeenCalledWith(
+      expect(mockUpdate).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
-          status: 'countered',
+          status: 'waiting_buyer',
           requested_unit_price: 33000,
           quantity: 15
         })
       );
-      expect(addDoc).toHaveBeenCalled();
+      expect(mockSet).toHaveBeenCalled();
       expect(createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
         event: 'NEGOTIATION_COUNTERED',
-        user: 'dist-123'
+        user: 'Super Distributor'
       }));
     });
 
@@ -241,6 +261,7 @@ describe('negotiationService', () => {
         'neg-123',
         'stranger-456',
         'DISTRIBUTOR',
+        'Stranger Distributor',
         33000,
         15,
         ''
@@ -261,6 +282,7 @@ describe('negotiationService', () => {
         'neg-123',
         'dist-123',
         'DISTRIBUTOR',
+        'Super Distributor',
         33000,
         15,
         ''
@@ -273,10 +295,19 @@ describe('negotiationService', () => {
       const mockNeg = {
         umkm_id: 'umkm-123',
         distributor_id: 'dist-123',
-        status: 'countered',
+        status: 'waiting_buyer',
         product_id: 'prod-123',
         quantity: 10,
         negotiation_code: 'NEG-12345'
+      };
+
+      const mockMsg = {
+        offer: {
+          unit_price: 32000,
+          quantity: 10,
+          status: 'pending',
+          offer_by: 'DISTRIBUTOR'
+        }
       };
 
       const mockProduct = {
@@ -286,11 +317,12 @@ describe('negotiationService', () => {
 
       vi.mocked(getDoc)
         .mockResolvedValueOnce({ exists: () => true, data: () => mockNeg } as any) // neg snap
+        .mockResolvedValueOnce({ exists: () => true, data: () => mockMsg } as any) // msg snap
         .mockResolvedValueOnce({ exists: () => true, data: () => mockProduct } as any); // product snap
 
-      await negotiationService.acceptOffer('neg-123', 'umkm-123', 'UMKM', 32000);
+      await negotiationService.acceptOffer('neg-123', 'msg-123', 'umkm-123', 'UMKM', 'Warung Budi');
 
-      expect(updateDoc).toHaveBeenCalledWith(
+      expect(mockUpdate).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
           status: 'accepted',
@@ -308,19 +340,37 @@ describe('negotiationService', () => {
       const mockNeg = {
         umkm_id: 'umkm-123',
         distributor_id: 'dist-123',
-        status: 'pending',
+        status: 'waiting_distributor',
         negotiation_code: 'NEG-12345'
       };
 
-      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => true, data: () => mockNeg } as any);
+      const mockMsg = {
+        offer: {
+          unit_price: 32000,
+          quantity: 10,
+          status: 'pending',
+          offer_by: 'UMKM'
+        }
+      };
 
-      await negotiationService.rejectOffer('neg-123', 'dist-123', 'DISTRIBUTOR', 'Harga terlalu rendah');
+      vi.mocked(getDoc)
+        .mockResolvedValueOnce({ exists: () => true, data: () => mockNeg } as any)
+        .mockResolvedValueOnce({ exists: () => true, data: () => mockMsg } as any);
 
-      expect(updateDoc).toHaveBeenCalledWith(
+      await negotiationService.rejectOffer(
+        'neg-123',
+        'msg-123',
+        'dist-123',
+        'DISTRIBUTOR',
+        'Super Distributor',
+        'Harga terlalu rendah'
+      );
+
+      expect(mockUpdate).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
           status: 'rejected',
-          latest_message: 'Negosiasi ditolak. Alasan: Harga terlalu rendah'
+          last_message: 'Penawaran ditolak oleh Distributor. Alasan: Harga terlalu rendah'
         })
       );
     });
@@ -339,7 +389,7 @@ describe('negotiationService', () => {
 
       await negotiationService.cancelNegotiation('neg-123', 'umkm-123');
 
-      expect(updateDoc).toHaveBeenCalledWith(
+      expect(mockUpdate).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
           status: 'cancelled'
@@ -406,11 +456,11 @@ describe('negotiationService', () => {
 
       expect(result.id).toBeDefined();
       expect(result.order_code).toMatch(/^ORD-\d+-\d+/);
-      expect(setDoc).toHaveBeenCalled();
-      expect(updateDoc).toHaveBeenCalledWith(
+      expect(mockSet).toHaveBeenCalled();
+      expect(mockUpdate).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
-          status: 'converted_to_order',
+          status: 'checked_out',
           converted_order_id: expect.any(String)
         })
       );

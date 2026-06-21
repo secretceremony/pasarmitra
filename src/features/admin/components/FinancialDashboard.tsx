@@ -410,12 +410,20 @@ export const FinancialDashboard = () => {
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-border/30">
-                      {payments.length === 0 ? (
-                         <tr>
-                            <td colSpan={7} className="py-20 text-center text-sm font-bold text-muted-foreground">
-                               Belum ada data pembayaran untuk ditampilkan. Data akan muncul setelah transaksi atau payout distributor tercatat.
-                            </td>
-                         </tr>
+                       {payments.length === 0 ? (
+                          <tr>
+                             <td colSpan={7} className="py-16 text-center">
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                  <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground/40 mx-auto">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-sm font-black text-foreground">Belum ada data pembayaran.</p>
+                                    <p className="text-xs font-medium text-muted-foreground">Data akan muncul setelah transaksi atau payout distributor tercatat di sistem.</p>
+                                  </div>
+                                </div>
+                             </td>
+                          </tr>
                       ) : (
                          payments.map((row, i) => (
                            <tr key={i} className="hover:bg-primary/5 transition-all group">

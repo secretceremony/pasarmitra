@@ -47,7 +47,7 @@ export default function Login() {
             Menghubungkan Distributor <br /> dengan UMKM Modern.
           </h1>
           <p className="text-xl text-primary-foreground/80 max-w-md">
-            Marketplace B2B paling terpercaya untuk mengembangkan bisnis rantai pasok Anda di seluruh Indonesia.
+            Marketplace B2B paling terpercaya untuk UMKM dan Distributor di Balikpapan, Kalimantan Timur.
           </p>
         </div>
         

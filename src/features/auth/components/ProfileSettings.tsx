@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { profileService } from '../services/profileService';
+import { db } from '../../../lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 import { UserRole, UserProfile } from '../types/auth.types';
 import { toast } from 'sonner';
@@ -37,6 +39,23 @@ export const ProfileSettings = () => {
   const [organizationName, setOrganizationName] = useState('');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
+  const [profileDistrict, setProfileDistrict] = useState('');
+
+  // UMKM Verification Form States
+  const [businessType, setBusinessType] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessDistrict, setBusinessDistrict] = useState('');
+  const [verificationPhone, setVerificationPhone] = useState('');
+  const [businessDocumentUrl, setBusinessDocumentUrl] = useState('');
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
+
+  // Distributor Verification Form States (mirrors UMKM)
+  const [distBusinessType, setDistBusinessType] = useState('');
+  const [distBusinessAddress, setDistBusinessAddress] = useState('');
+  const [distBusinessDistrict, setDistBusinessDistrict] = useState('');
+  const [distVerificationPhone, setDistVerificationPhone] = useState('');
+  const [distBusinessDocumentUrl, setDistBusinessDocumentUrl] = useState('');
+  const [isSubmittingDistVerification, setIsSubmittingDistVerification] = useState(false);
 
   // Fetch real profile data on mount
   useEffect(() => {
@@ -53,6 +72,25 @@ export const ProfileSettings = () => {
         setOrganizationName(data.organization_name || '');
         setAddress(data.address || '');
         setDescription(data.description || '');
+        setProfileDistrict(data.business_district || '');
+
+        // Populate UMKM verification fields if UMKM
+        if (data.role === UserRole.UMKM) {
+          setBusinessType(data.business_type || '');
+          setBusinessAddress(data.business_address || data.address || '');
+          setBusinessDistrict(data.business_district || '');
+          setVerificationPhone(data.phone || data.phone || '');
+          setBusinessDocumentUrl(data.business_document_url || '');
+        }
+
+        // Populate Distributor verification fields if DISTRIBUTOR
+        if (data.role === UserRole.DISTRIBUTOR) {
+          setDistBusinessType(data.business_type || '');
+          setDistBusinessAddress(data.business_address || data.address || '');
+          setDistBusinessDistrict(data.business_district || '');
+          setDistVerificationPhone(data.phone || '');
+          setDistBusinessDocumentUrl(data.business_document_url || '');
+        }
 
         // Update local store just in case it is out of sync
         setUser(data);
@@ -66,6 +104,107 @@ export const ProfileSettings = () => {
 
     loadProfileData();
   }, [user?.id, setUser]);
+
+  const handleApplyUMKMVerification = async () => {
+    if (!user?.id) return;
+    if (!businessType) {
+      toast.error('Silakan pilih tipe usaha Anda.');
+      return;
+    }
+    if (!verificationPhone.trim()) {
+      toast.error('Nomor telepon toko wajib diisi.');
+      return;
+    }
+    if (!businessDistrict) {
+      toast.error('Silakan pilih kecamatan toko di Balikpapan.');
+      return;
+    }
+    if (!businessAddress.trim()) {
+      toast.error('Alamat lengkap toko wajib diisi.');
+      return;
+    }
+
+    setIsSubmittingVerification(true);
+    try {
+      const docRef = doc(db, 'profiles', user.id);
+      const updateData = {
+        is_verified: false,
+        verification_status: 'PENDING_REVIEW',
+        business_type: businessType,
+        phone: verificationPhone.trim(),
+        business_district: businessDistrict,
+        business_address: businessAddress.trim(),
+        address: businessAddress.trim(), // sync main address too
+        business_document_url: businessDocumentUrl.trim() || '',
+        updated_at: new Date().toISOString()
+      };
+
+      await updateDoc(docRef, updateData);
+
+      // Update state in useAuthStore
+      setUser({
+        ...user,
+        ...updateData
+      });
+
+      toast.success('Pengajuan verifikasi UMKM berhasil dikirim. Menunggu review admin.');
+    } catch (err: any) {
+      console.error('Failed to submit UMKM verification:', err);
+      toast.error(err.message || 'Gagal mengirimkan pengajuan verifikasi.');
+    } finally {
+      setIsSubmittingVerification(false);
+    }
+  };
+
+  const handleApplyDistributorVerification = async () => {
+    if (!user?.id) return;
+    if (!distBusinessType) {
+      toast.error('Silakan pilih tipe distributor Anda.');
+      return;
+    }
+    if (!distVerificationPhone.trim()) {
+      toast.error('Nomor telepon usaha wajib diisi.');
+      return;
+    }
+    if (!distBusinessDistrict) {
+      toast.error('Silakan pilih kecamatan usaha di Balikpapan.');
+      return;
+    }
+    if (!distBusinessAddress.trim()) {
+      toast.error('Alamat usaha/gudang wajib diisi.');
+      return;
+    }
+
+    setIsSubmittingDistVerification(true);
+    try {
+      const docRef = doc(db, 'profiles', user.id);
+      const updateData = {
+        is_verified: false,
+        verification_status: 'PENDING_REVIEW',
+        business_type: distBusinessType,
+        phone: distVerificationPhone.trim(),
+        business_district: distBusinessDistrict,
+        business_address: distBusinessAddress.trim(),
+        address: distBusinessAddress.trim(), // sync main address too
+        business_document_url: distBusinessDocumentUrl.trim() || '',
+        updated_at: new Date().toISOString()
+      };
+
+      await updateDoc(docRef, updateData);
+
+      setUser({
+        ...user,
+        ...updateData
+      });
+
+      toast.success('Pengajuan verifikasi distributor berhasil dikirim. Menunggu review admin.');
+    } catch (err: any) {
+      console.error('Failed to submit Distributor verification:', err);
+      toast.error(err.message || 'Gagal mengirimkan pengajuan verifikasi.');
+    } finally {
+      setIsSubmittingDistVerification(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -101,6 +240,11 @@ export const ProfileSettings = () => {
           setIsSaving(false);
           return;
         }
+        if (!profileDistrict) {
+          toast.error('Silakan pilih kecamatan di Balikpapan');
+          setIsSaving(false);
+          return;
+        }
       }
 
       await profileService.updateProfile(user.id, user.role, {
@@ -109,6 +253,7 @@ export const ProfileSettings = () => {
         organization_name: user.role !== UserRole.ADMIN ? organizationName : undefined,
         address: user.role !== UserRole.ADMIN ? address : undefined,
         description: user.role !== UserRole.ADMIN ? description : undefined,
+        business_district: user.role !== UserRole.ADMIN ? profileDistrict : undefined,
       });
 
       // Update local store state instantly so UI updates without page reload
@@ -119,6 +264,7 @@ export const ProfileSettings = () => {
         organization_name: user.role !== UserRole.ADMIN ? organizationName : undefined,
         address: user.role !== UserRole.ADMIN ? address : undefined,
         description: user.role !== UserRole.ADMIN ? description : undefined,
+        business_district: user.role !== UserRole.ADMIN ? profileDistrict : undefined,
         updated_at: new Date().toISOString()
       });
 
@@ -148,28 +294,21 @@ export const ProfileSettings = () => {
   const getVerificationBadge = () => {
     if (user.role === UserRole.ADMIN) return null;
 
-    if (user.role === UserRole.DISTRIBUTOR) {
-      const status = user.verification_status || 'NOT_SUBMITTED';
-      switch (status) {
-        case 'VERIFIED':
-          return <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Terverifikasi</span>;
-        case 'PENDING_REVIEW':
-          return <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Menunggu Review</span>;
-        case 'REJECTED':
-          return <span className="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Ditolak</span>;
-        case 'ESCALATED':
-          return <span className="bg-purple-500/10 text-purple-500 border border-purple-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Audit Khusus</span>;
-        default:
-          return <span className="bg-muted text-muted-foreground border border-border px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Belum Diverifikasi</span>;
-      }
+    const status = user.verification_status || 'NOT_SUBMITTED';
+    switch (status) {
+      case 'VERIFIED':
+        return <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Terverifikasi</span>;
+      case 'PENDING_REVIEW':
+        return <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Menunggu Review Admin</span>;
+      case 'REJECTED':
+        return <span className="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Ditolak</span>;
+      case 'NEEDS_REVISION':
+        return <span className="bg-purple-500/10 text-purple-500 border border-purple-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Perlu Revisi</span>;
+      case 'ESCALATED':
+        return <span className="bg-purple-500/10 text-purple-500 border border-purple-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Audit Khusus</span>;
+      default:
+        return <span className="bg-muted text-muted-foreground border border-border px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Belum Diverifikasi</span>;
     }
-
-    // For UMKM
-    return user.is_verified ? (
-      <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Mitra Terverifikasi</span>
-    ) : (
-      <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">Belum Diverifikasi</span>
-    );
   };
 
   if (isLoading) {
@@ -219,27 +358,162 @@ export const ProfileSettings = () => {
         </div>
       </div>
 
-      {/* Distributor Verification Alert Banner */}
-      {user.role === UserRole.DISTRIBUTOR && user.verification_status !== 'VERIFIED' && (
-        <div className="p-8 bg-amber-500/10 border border-amber-500/20 rounded-[2.5rem] flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-xl shadow-amber-500/5 ml-0">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
-               <AlertTriangle size={28} />
+      {/* Distributor Verification Panel — replaces amber banner */}
+      {user.role === UserRole.DISTRIBUTOR && (
+        <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-8 shadow-xl">
+          <h3 className="text-2xl font-black tracking-tight flex items-center gap-3 border-b border-border/30 pb-4">
+            <ShieldCheck className="text-primary" size={24} />
+            Verifikasi Usaha Distributor
+          </h3>
+
+          {/* Status Banner */}
+          <div className="p-6 bg-muted/20 rounded-2xl border border-border/40 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-bold text-muted-foreground">Status Verifikasi Saat Ini:</span>
+              {getVerificationBadge()}
             </div>
-            <div>
-              <h3 className="text-xl font-black tracking-tight text-amber-800">
-                Lengkapi Verifikasi Legalitas
-              </h3>
-              <p className="text-sm font-semibold text-amber-700/80 leading-relaxed mt-1">
-                Akun distributor Anda belum terverifikasi resmi. Lengkapi berkas legalitas usaha Anda agar dapat mulai mengunggah dan menjual produk.
-              </p>
-            </div>
+            {user.verification_notes && (
+              <div className="mt-2 text-xs font-semibold text-rose-500 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
+                <span className="font-black block uppercase mb-1">Catatan Admin:</span>
+                {user.verification_notes}
+              </div>
+            )}
+            {user.rejection_reason && (
+              <div className="mt-2 text-xs font-semibold text-rose-500 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
+                <span className="font-black block uppercase mb-1">Alasan Penolakan:</span>
+                {user.rejection_reason}
+              </div>
+            )}
           </div>
-          <Link to="/distributor/legal-docs">
-            <Button className="h-14 px-8 rounded-2xl bg-amber-600 text-white font-black hover:bg-amber-700 shadow-lg shadow-amber-600/20 whitespace-nowrap">
-              Ajukan Verifikasi Legalitas
-            </Button>
-          </Link>
+
+          {/* Show form if not VERIFIED or PENDING_REVIEW */}
+          {(user.verification_status !== 'VERIFIED' && user.verification_status !== 'PENDING_REVIEW') ? (
+            <div className="space-y-6">
+              <p className="text-xs text-muted-foreground font-semibold leading-relaxed">
+                PasarMitra saat ini hanya melayani wilayah Balikpapan. Pilih kecamatan usaha Anda dan isi alamat lengkap secara manual.
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Business Type */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                    Tipe Distributor <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={distBusinessType}
+                    onChange={(e) => setDistBusinessType(e.target.value)}
+                    disabled={isSubmittingDistVerification}
+                    className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                  >
+                    <option value="">Pilih Tipe Distributor</option>
+                    <option value="Sembako" className="bg-card text-foreground">Sembako</option>
+                    <option value="F&B" className="bg-card text-foreground">F&B</option>
+                    <option value="Sayur & Buah" className="bg-card text-foreground">Sayur & Buah</option>
+                    <option value="Daging / Protein" className="bg-card text-foreground">Daging / Protein</option>
+                    <option value="Frozen Food" className="bg-card text-foreground">Frozen Food</option>
+                    <option value="Perlengkapan Usaha" className="bg-card text-foreground">Perlengkapan Usaha</option>
+                    <option value="Lainnya" className="bg-card text-foreground">Lainnya</option>
+                  </select>
+                </div>
+
+                {/* Phone Number */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                    Nomor Telepon Usaha <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={distVerificationPhone}
+                    onChange={(e) => setDistVerificationPhone(e.target.value)}
+                    disabled={isSubmittingDistVerification}
+                    placeholder="Contoh: 081234567890"
+                    className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                  />
+                </div>
+
+                {/* District Dropdown */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                    Kecamatan di Balikpapan <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={distBusinessDistrict}
+                    onChange={(e) => setDistBusinessDistrict(e.target.value)}
+                    disabled={isSubmittingDistVerification}
+                    className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                  >
+                    <option value="">Pilih Kecamatan</option>
+                    <option value="Balikpapan Kota" className="bg-card text-foreground">Balikpapan Kota</option>
+                    <option value="Balikpapan Selatan" className="bg-card text-foreground">Balikpapan Selatan</option>
+                    <option value="Balikpapan Tengah" className="bg-card text-foreground">Balikpapan Tengah</option>
+                    <option value="Balikpapan Utara" className="bg-card text-foreground">Balikpapan Utara</option>
+                    <option value="Balikpapan Barat" className="bg-card text-foreground">Balikpapan Barat</option>
+                    <option value="Balikpapan Timur" className="bg-card text-foreground">Balikpapan Timur</option>
+                  </select>
+                  <p className="text-[10px] text-muted-foreground font-semibold">
+                    PasarMitra saat ini hanya melayani wilayah Balikpapan.
+                  </p>
+                </div>
+
+                {/* Business Address */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                    Alamat Usaha / Gudang di Balikpapan <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={distBusinessAddress}
+                    onChange={(e) => setDistBusinessAddress(e.target.value)}
+                    disabled={isSubmittingDistVerification}
+                    placeholder="Contoh: Jl. MT Haryono No. 10, Damai, Balikpapan Selatan"
+                    className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                  />
+                </div>
+
+                {/* Business Document URL / Note */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                    Dokumen Pendukung (NIB / SIUP / Foto Gudang / URL)
+                  </label>
+                  <input
+                    type="text"
+                    value={distBusinessDocumentUrl}
+                    onChange={(e) => setDistBusinessDocumentUrl(e.target.value)}
+                    disabled={isSubmittingDistVerification}
+                    placeholder="Contoh: NIB 12345678 atau link google drive foto gudang..."
+                    className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleApplyDistributorVerification}
+                disabled={isSubmittingDistVerification}
+                className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black text-sm uppercase shadow-xl shadow-primary/20"
+              >
+                {isSubmittingDistVerification ? 'Mengirim Pengajuan...' : 'Ajukan Verifikasi Distributor'}
+              </Button>
+            </div>
+          ) : (
+            <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-4">
+              <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-black text-sm text-emerald-800">
+                  {user.verification_status === 'VERIFIED' ? 'Akun Distributor Anda Terverifikasi' : 'Menunggu Peninjauan Admin'}
+                </h4>
+                <p className="text-xs font-semibold text-emerald-700/80 leading-relaxed mt-1">
+                  {user.verification_status === 'VERIFIED'
+                    ? 'Akun distributor Anda sudah aktif. Produk Anda dapat tampil di marketplace.'
+                    : 'Data verifikasi berhasil dikirim. Admin kami sedang meninjau pengajuan Anda. Proses ini biasanya memakan waktu kurang dari 24 jam.'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -340,6 +614,28 @@ export const ProfileSettings = () => {
                   />
                 </div>
 
+                {/* Business District */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <MapPin size={12} /> Kecamatan di Balikpapan <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={profileDistrict}
+                    onChange={(e) => setProfileDistrict(e.target.value)}
+                    disabled={isSaving}
+                    className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground font-sans cursor-pointer"
+                  >
+                    <option value="">Pilih Kecamatan</option>
+                    <option value="Balikpapan Kota" className="bg-card text-foreground">Balikpapan Kota</option>
+                    <option value="Balikpapan Selatan" className="bg-card text-foreground">Balikpapan Selatan</option>
+                    <option value="Balikpapan Tengah" className="bg-card text-foreground">Balikpapan Tengah</option>
+                    <option value="Balikpapan Utara" className="bg-card text-foreground">Balikpapan Utara</option>
+                    <option value="Balikpapan Barat" className="bg-card text-foreground">Balikpapan Barat</option>
+                    <option value="Balikpapan Timur" className="bg-card text-foreground">Balikpapan Timur</option>
+                  </select>
+                </div>
+
                 {/* Business Address */}
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -350,9 +646,12 @@ export const ProfileSettings = () => {
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     disabled={isSaving}
-                    placeholder="Masukkan alamat lengkap..."
+                    placeholder="Masukkan alamat lengkap di Balikpapan..."
                     className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all"
                   />
+                  <p className="text-[10px] text-muted-foreground font-semibold">
+                    Saat ini PasarMitra hanya melayani area Balikpapan.
+                  </p>
                 </div>
 
                 {/* Business Description */}
@@ -366,10 +665,168 @@ export const ProfileSettings = () => {
                     disabled={isSaving}
                     placeholder="Masukkan deskripsi singkat profil usaha Anda..."
                     rows={4}
-                    className="w-full bg-muted/20 border border-border/60 rounded-[1.5rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                    className="w-full bg-muted/20 border border-border/60 rounded-[1.5rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none font-sans"
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Card: UMKM Verification */}
+          {user.role === UserRole.UMKM && (
+            <div className="bg-card border border-border/50 rounded-[2.5rem] p-10 space-y-8 shadow-xl">
+              <h3 className="text-2xl font-black tracking-tight flex items-center gap-3 border-b border-border/30 pb-4">
+                <ShieldCheck className="text-primary" size={24} />
+                Verifikasi Usaha UMKM
+              </h3>
+
+              {/* Status Banner */}
+              <div className="p-6 bg-muted/20 rounded-2xl border border-border/40 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-bold text-muted-foreground">Status Verifikasi Saat Ini:</span>
+                  {getVerificationBadge()}
+                </div>
+                {user.verification_notes && (
+                  <div className="mt-2 text-xs font-semibold text-rose-500 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
+                    <span className="font-black block uppercase mb-1">Catatan Admin:</span>
+                    {user.verification_notes}
+                  </div>
+                )}
+                {user.rejection_reason && (
+                  <div className="mt-2 text-xs font-semibold text-rose-500 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
+                    <span className="font-black block uppercase mb-1">Alasan Penolakan:</span>
+                    {user.rejection_reason}
+                  </div>
+                )}
+              </div>
+
+              {/* Only show verification form if not already verified or pending, or if rejected/needs revision */}
+              {(user.verification_status !== 'VERIFIED' && user.verification_status !== 'PENDING_REVIEW') ? (
+                <div className="space-y-6">
+                  <p className="text-xs text-muted-foreground font-semibold leading-relaxed">
+                    Lengkapi formulir verifikasi di bawah ini untuk mengaktifkan fitur pembelian. Jangkauan layanan saat ini hanya tersedia untuk area Balikpapan.
+                  </p>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Business Type */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                        Tipe Usaha <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={businessType}
+                        onChange={(e) => setBusinessType(e.target.value)}
+                        disabled={isSubmittingVerification}
+                        className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                      >
+                        <option value="">Pilih Tipe Usaha</option>
+                        <option value="Warung" className="bg-card text-foreground">Warung</option>
+                        <option value="Toko Kelontong" className="bg-card text-foreground">Toko Kelontong</option>
+                        <option value="Kafe / F&B" className="bg-card text-foreground">Kafe / F&B</option>
+                        <option value="Catering" className="bg-card text-foreground">Catering</option>
+                        <option value="Retail kecil" className="bg-card text-foreground">Retail kecil</option>
+                        <option value="Lainnya" className="bg-card text-foreground">Lainnya</option>
+                      </select>
+                    </div>
+
+                    {/* Phone Number */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                        Nomor Telepon Toko <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={verificationPhone}
+                        onChange={(e) => setVerificationPhone(e.target.value)}
+                        disabled={isSubmittingVerification}
+                        placeholder="Contoh: 081234567890"
+                        className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                      />
+                    </div>
+
+                    {/* District Dropdown */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                        Kecamatan di Balikpapan <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={businessDistrict}
+                        onChange={(e) => setBusinessDistrict(e.target.value)}
+                        disabled={isSubmittingVerification}
+                        className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                      >
+                        <option value="">Pilih Kecamatan</option>
+                        <option value="Balikpapan Kota" className="bg-card text-foreground">Balikpapan Kota</option>
+                        <option value="Balikpapan Selatan" className="bg-card text-foreground">Balikpapan Selatan</option>
+                        <option value="Balikpapan Tengah" className="bg-card text-foreground">Balikpapan Tengah</option>
+                        <option value="Balikpapan Utara" className="bg-card text-foreground">Balikpapan Utara</option>
+                        <option value="Balikpapan Barat" className="bg-card text-foreground">Balikpapan Barat</option>
+                        <option value="Balikpapan Timur" className="bg-card text-foreground">Balikpapan Timur</option>
+                      </select>
+                    </div>
+
+                    {/* Business Address */}
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                        Alamat Lengkap Toko di Balikpapan <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={businessAddress}
+                        onChange={(e) => setBusinessAddress(e.target.value)}
+                        disabled={isSubmittingVerification}
+                        placeholder="Contoh: Jl. Jend. Sudirman No. 12, Balikpapan Kota, Balikpapan"
+                        className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                      />
+                      <p className="text-[10px] text-muted-foreground font-semibold">
+                        Saat ini PasarMitra hanya melayani area Balikpapan.
+                      </p>
+                    </div>
+
+                    {/* Business Document URL / Note */}
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                        Teks Bukti Usaha / URL Dokumen (NIB / SKU / Foto Toko)
+                      </label>
+                      <input
+                        type="text"
+                        value={businessDocumentUrl}
+                        onChange={(e) => setBusinessDocumentUrl(e.target.value)}
+                        disabled={isSubmittingVerification}
+                        placeholder="Contoh: NIB 123456789 atau link google drive foto toko..."
+                        className="w-full h-14 bg-muted/20 border border-border/60 rounded-2xl px-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={handleApplyUMKMVerification}
+                    disabled={isSubmittingVerification}
+                    className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black text-sm uppercase shadow-xl shadow-primary/20"
+                  >
+                    {isSubmittingVerification ? 'Mengirim Pengajuan...' : 'Ajukan Verifikasi UMKM'}
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-4">
+                  <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <h4 className="font-black text-sm text-emerald-800">
+                      {user.verification_status === 'VERIFIED' ? 'Pendaftaran Anda Disetujui' : 'Menunggu Peninjauan Admin'}
+                    </h4>
+                    <p className="text-xs font-semibold text-emerald-700/80 leading-relaxed mt-1">
+                      {user.verification_status === 'VERIFIED' 
+                        ? 'Akun UMKM Anda sudah aktif sepenuhnya dan dapat melakukan checkout pesanan.' 
+                        : 'Pengisian data berhasil dikirim. Admin kami sedang meninjau dokumen usaha Anda. Proses ini biasanya memakan waktu kurang dari 24 jam.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

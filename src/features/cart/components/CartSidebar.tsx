@@ -24,8 +24,8 @@ export const CartSidebar = ({ onClose }: { onClose: () => void }) => {
     <div className="flex flex-col h-full bg-card/60 backdrop-blur-3xl">
       <div className="p-10 flex items-center justify-between border-b border-border/50">
          <div className="space-y-1">
-            <h3 className="font-black text-2xl tracking-tighter">Procurement Cart</h3>
-            <p className="text-xs font-black text-primary uppercase tracking-widest">{totalItems()} items selected</p>
+            <h3 className="font-black text-2xl tracking-tighter">Keranjang Belanja</h3>
+            <p className="text-xs font-black text-primary uppercase tracking-widest">{totalItems()} barang terpilih</p>
          </div>
          <Button variant="ghost" size="icon" className="rounded-2xl h-12 w-12 hover:bg-white/5" onClick={onClose}>
             <X size={24} />
@@ -38,9 +38,12 @@ export const CartSidebar = ({ onClose }: { onClose: () => void }) => {
              <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center text-muted-foreground opacity-20">
                 <ShoppingBag size={48} />
              </div>
-             <p className="font-black text-muted-foreground italic">Your procurement list is empty.</p>
-             <Button variant="outline" className="rounded-2xl border-primary text-primary font-black uppercase" onClick={onClose}>
-                Browse Inventory
+             <div className="space-y-2">
+               <p className="font-black text-foreground text-lg">Keranjang belanja Anda kosong.</p>
+               <p className="font-medium text-sm text-muted-foreground">Temukan produk sembako dari distributor terpercaya.</p>
+             </div>
+             <Button variant="outline" className="rounded-2xl border-primary text-primary font-black uppercase" onClick={() => { onClose(); navigate('/marketplace'); }}>
+                Jelajahi Marketplace
              </Button>
           </div>
         ) : (
@@ -96,12 +99,12 @@ export const CartSidebar = ({ onClose }: { onClose: () => void }) => {
         <div className="p-10 bg-background/40 backdrop-blur-3xl border-t border-border/50 space-y-8">
            <div className="space-y-4">
               <div className="flex justify-between items-center text-muted-foreground font-bold">
-                 <span className="text-xs uppercase tracking-widest">Estimated Tax</span>
+                 <span className="text-xs uppercase tracking-widest">Perkiraan Pajak</span>
                  <span className="text-foreground italic">Rp 0 (B2B Exempt)</span>
               </div>
               <div className="flex justify-between items-end border-t border-border/30 pt-4">
                  <div className="space-y-1">
-                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Total Procurement Value</p>
+                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Total Nilai Pengadaan</p>
                     <p className="text-4xl font-black text-foreground tracking-tighter italic">Rp {totalPrice().toLocaleString()}</p>
                  </div>
               </div>
@@ -112,12 +115,12 @@ export const CartSidebar = ({ onClose }: { onClose: () => void }) => {
                 onClick={() => { navigate('/checkout'); onClose(); }}
                 className="w-full h-16 rounded-[1.5rem] bg-primary text-primary-foreground font-black text-xl flex items-center justify-between px-10 shadow-2xl shadow-primary/30 group hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                 Checkout Order
+                 Checkout Pesanan
                  <ChevronRight size={28} className="group-hover:translate-x-1 transition-transform" />
               </Button>
               <div className="flex items-center justify-center gap-2 text-primary">
                  <ShieldCheck size={16} />
-                 <span className="text-[10px] font-black uppercase tracking-widest">Secure Industrial Payment Active</span>
+                 <span className="text-[10px] font-black uppercase tracking-widest">Pembayaran B2B Aman Aktif</span>
               </div>
            </div>
         </div>

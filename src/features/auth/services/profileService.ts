@@ -31,6 +31,7 @@ export const profileService = {
       organization_name?: string;
       address?: string;
       description?: string;
+      business_district?: string;
     }
   ): Promise<void> {
     if (!uid) {
@@ -62,6 +63,7 @@ export const profileService = {
       updatePayload.organization_name = data.organization_name.trim();
       updatePayload.address = data.address?.trim() || '';
       updatePayload.description = data.description?.trim() || '';
+      updatePayload.business_district = data.business_district?.trim() || '';
     }
 
     const docRef = doc(db, 'profiles', uid);

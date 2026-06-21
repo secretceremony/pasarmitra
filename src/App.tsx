@@ -16,15 +16,17 @@ import { Toaster } from 'sonner';
 import { Login, Register, RegisterUniversal, ForgotPassword } from './features/auth';
 import Dashboard from './pages/Dashboard';
 import Marketplace from './pages/Marketplace';
+import Notifications from './pages/Notifications';
+import Cart from './pages/Cart';
 import { DistributorProfile } from './features/marketplace/components/DistributorProfile';
 import { CheckoutWizard } from './features/checkout/components/CheckoutWizard';
+import DistributorsList from './pages/DistributorsList';
+import { ProductDetailPage } from './pages/ProductDetailPage';
 
 // Admin Features
 import { AdminDashboard } from './features/admin/components/AdminDashboard';
 import { UserManagement } from './features/admin/components/UserManagement';
 import { DistributorVerification } from './features/admin/components/DistributorVerification';
-import { FinancialDashboard } from './features/admin/components/FinancialDashboard';
-import { CommissionManagement } from './features/admin/components/CommissionManagement';
 import { ModerationSystem } from './features/admin/components/ModerationSystem';
 import { DisputeManagement } from './features/admin/components/DisputeManagement';
 import { AuditLogSystem } from './features/admin/components/AuditLogSystem';
@@ -32,8 +34,15 @@ import { AuditLogSystem } from './features/admin/components/AuditLogSystem';
 // Distributor Features
 import { ProductManagement } from './features/inventory/components/ProductManagement';
 import { OrderManagement } from './features/orders/components/OrderManagement';
+import { OrderDetail } from './features/orders/components/OrderDetail';
 import { ChatNegotiation } from './features/partners/components/ChatNegotiation';
 import { LegalDocuments } from './features/inventory/components/LegalDocuments';
+
+// Dispute Features
+import { UMKMDisputesList } from './features/orders/components/UMKMDisputesList';
+import { UMKMDisputeDetail } from './features/orders/components/UMKMDisputeDetail';
+import { DistributorDisputesList } from './features/orders/components/DistributorDisputesList';
+import { DistributorDisputeDetail } from './features/orders/components/DistributorDisputeDetail';
 
 const DashboardRedirect = () => {
   const { user } = useAuthStore();
@@ -73,11 +82,17 @@ export default function App() {
                    
                    {/* UMKM Only Routes */}
                    <Route element={<ProtectedRoute allowedRoles={[UserRole.UMKM]} />}>
-                     <Route path="/marketplace" element={<Marketplace />} />
-                     <Route path="/checkout" element={<CheckoutWizard />} />
-                     <Route path="/umkm/dashboard" element={<Dashboard />} />
-                     <Route path="/umkm/profile" element={<ProfileSettings />} />
-                     <Route path="/umkm/negosiasi-harga" element={<ChatNegotiation />} />
+                      <Route path="/marketplace" element={<Marketplace />} />
+                      <Route path="/checkout" element={<CheckoutWizard />} />
+                      <Route path="/umkm/cart" element={<Cart />} />
+                      <Route path="/umkm/dashboard" element={<Dashboard />} />
+                      <Route path="/umkm/profile" element={<ProfileSettings />} />
+                      <Route path="/umkm/negosiasi-harga" element={<ChatNegotiation />} />
+                      <Route path="/umkm/distributors" element={<DistributorsList />} />
+                      <Route path="/umkm/orders/:orderId" element={<OrderDetail />} />
+                      <Route path="/umkm/disputes" element={<UMKMDisputesList />} />
+                      <Route path="/umkm/disputes/:disputeId" element={<UMKMDisputeDetail />} />
+                      <Route path="/umkm/products/:productId" element={<ProductDetailPage />} />
                    </Route>
                    
                    {/* Admin Only Routes */}
@@ -86,17 +101,19 @@ export default function App() {
                      <Route path="/admin/dashboard" element={<AdminDashboard />} />
                      <Route path="/admin/users" element={<UserManagement />} />
                      <Route path="/admin/verifications" element={<DistributorVerification />} />
-                     <Route path="/admin/finances" element={<FinancialDashboard />} />
-                     <Route path="/admin/commissions" element={<CommissionManagement />} />
+                     <Route path="/admin/finances" element={<Navigate to="/admin/dashboard" replace />} />
+                     <Route path="/admin/commissions" element={<Navigate to="/admin/dashboard" replace />} />
                      <Route path="/admin/moderation" element={<ModerationSystem />} />
                      <Route path="/admin/disputes" element={<DisputeManagement />} />
                      <Route path="/admin/audit" element={<AuditLogSystem />} />
                      <Route path="/admin/profile" element={<ProfileSettings />} />
+                     <Route path="/admin/orders/:orderId" element={<OrderDetail />} />
                    </Route>
                    
                    {/* General Protected Routes */}
                    <Route path="/negotiations" element={<NegotiationsRedirect />} />
                    <Route path="/orders" element={<OrderManagement />} />
+                   <Route path="/notifications" element={<Notifications />} />
                    
                    {/* Distributor Only Routes */}
                    <Route element={<ProtectedRoute allowedRoles={[UserRole.DISTRIBUTOR, UserRole.ADMIN]} />}>
@@ -104,6 +121,9 @@ export default function App() {
                      <Route path="/distributor/legal-docs" element={<LegalDocuments />} />
                      <Route path="/distributor/profile" element={<ProfileSettings />} />
                      <Route path="/distributor/negosiasi-harga" element={<ChatNegotiation />} />
+                     <Route path="/distributor/orders/:orderId" element={<OrderDetail />} />
+                     <Route path="/distributor/disputes" element={<DistributorDisputesList />} />
+                     <Route path="/distributor/disputes/:disputeId" element={<DistributorDisputeDetail />} />
                      
                      {/* Redirect removed distributor routes */}
                      <Route path="/distributor/dashboard" element={<Dashboard />} />
@@ -116,7 +136,27 @@ export default function App() {
               </Route>
 
               {/* Error Routes */}
-              <Route path="/unauthorized" element={<div className="min-h-screen flex items-center justify-center">Unauthorized Access</div>} />
+              <Route path="/unauthorized" element={
+                <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-4">
+                  <div className="bg-slate-900 border border-slate-800 shadow-2xl rounded-2xl p-8 max-w-md w-full text-center space-y-6">
+                    <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mx-auto border border-rose-500/20">
+                      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-black tracking-tight text-white">Akses Dibatasi</h2>
+                      <p className="text-sm text-slate-400 font-medium">Anda tidak memiliki izin atau peran Anda telah berubah. Silakan kembali ke dashboard.</p>
+                    </div>
+                    <button 
+                      onClick={() => window.location.href = '/dashboard'} 
+                      className="w-full h-12 bg-primary hover:bg-primary/95 text-primary-foreground font-black text-sm uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                    >
+                      Kembali ke Dashboard
+                    </button>
+                  </div>
+                </div>
+              } />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

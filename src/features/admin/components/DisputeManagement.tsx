@@ -27,49 +27,11 @@ import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { useAuthStore } from '../../../store/use-auth-store';
-import { createAuditLog, updateDisputeStatus } from '../services/adminService';
+import { createAuditLog } from '../services/adminService';
+import { disputeService } from '../../orders/services/disputeService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
 import { formatDateTime } from '../../../lib/dateUtils';
-
-const DEFAULT_DISPUTES = [
-  {
-    id: 'dsp-101',
-    reason: 'Barang Rusak Saat Pengiriman',
-    claimant: 'Toko Kelontong Berkah',
-    buyer_name: 'Toko Kelontong Berkah',
-    defendant: 'CV. Sembako Mandiri',
-    distributor_name: 'CV. Sembako Mandiri',
-    amount: 'Rp 4.500.000',
-    created: '3 jam yang lalu',
-    status: 'OPEN',
-    description: 'Sebanyak 10 karton minyak goreng bocor dan merusak kemasan beras lainnya saat pengiriman menggunakan truk distributor.',
-  },
-  {
-    id: 'dsp-102',
-    reason: 'Keterlambatan Pengiriman 5 Hari',
-    claimant: 'Koperasi Tani Makmur',
-    buyer_name: 'Koperasi Tani Makmur',
-    defendant: 'PT. Distribusi Logistik Nusantara',
-    distributor_name: 'PT. Distribusi Logistik Nusantara',
-    amount: 'Rp 12.000.000',
-    created: '1 hari yang lalu',
-    status: 'IN_MEDIATION',
-    description: 'Pengiriman pupuk bersubsidi mengalami keterlambatan ekstrim tanpa pemberitahuan, menyebabkan UMKM kehilangan momentum musim tanam.',
-  },
-  {
-    id: 'dsp-103',
-    reason: 'Jumlah Pesanan Tidak Sesuai',
-    claimant: 'Warung Bu Sri',
-    buyer_name: 'Warung Bu Sri',
-    defendant: 'Distributor Sembako Jakarta',
-    distributor_name: 'Distributor Sembako Jakarta',
-    amount: 'Rp 1.250.000',
-    created: '2 hari yang lalu',
-    status: 'OPEN',
-    description: 'Pesanan tertera 50 dus mi instan, namun yang diterima di lokasi hanya 40 dus. Pihak sopir menolak menandatangani selisih barang.',
-  }
-];
 
 export const DisputeManagement = () => {
   const [disputes, setDisputes] = useState<any[]>([]);
@@ -80,7 +42,7 @@ export const DisputeManagement = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Decision states
-  const [actionType, setActionType] = useState<'refund' | 'reject' | 'mediation' | null>(null);
+  const [actionType, setActionType] = useState<'refund' | 'reject' | 'mediation' | 'replacement' | null>(null);
   const [refundAmountVal, setRefundAmountVal] = useState('');
   const [refundNoteVal, setRefundNoteVal] = useState('');
   const [rejectionReasonVal, setRejectionReasonVal] = useState('');
@@ -90,20 +52,11 @@ export const DisputeManagement = () => {
     try {
       setIsLoading(true);
       const qSnap = await getDocs(collection(db, 'disputes'));
-      if (qSnap.empty) {
-        const list: any[] = [];
-        for (const item of DEFAULT_DISPUTES) {
-          await setDoc(doc(db, 'disputes', item.id), item);
-          list.push(item);
-        }
-        setDisputes(list);
-      } else {
-        const dList: any[] = [];
-        qSnap.forEach((docSnap) => {
-          dList.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        setDisputes(dList);
-      }
+      const dList: any[] = [];
+      qSnap.forEach((docSnap) => {
+        dList.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setDisputes(dList);
     } catch (err) {
       console.error("Gagal memuat sengketa:", err);
       toast.error('Gagal memuat sengketa.');
@@ -140,9 +93,11 @@ export const DisputeManagement = () => {
 
     setIsProcessing(true);
     try {
-      await updateDisputeStatus(selectedId, 'refund', currentUser?.email || 'admin@example.com', {
+      await disputeService.resolveDispute(selectedId, {
+        decision: 'approve_refund',
         refund_amount: amountNum,
-        refund_note: refundNoteVal
+        notes: refundNoteVal,
+        decided_by: currentUser?.email || 'admin@example.com'
       });
 
       toast.success('Persetujuan refund berhasil dikirim.');
@@ -170,8 +125,10 @@ export const DisputeManagement = () => {
 
     setIsProcessing(true);
     try {
-      await updateDisputeStatus(selectedId, 'reject', currentUser?.email || 'admin@example.com', {
-        rejection_reason: rejectionReasonVal.trim()
+      await disputeService.resolveDispute(selectedId, {
+        decision: 'reject_claim',
+        notes: rejectionReasonVal.trim(),
+        decided_by: currentUser?.email || 'admin@example.com'
       });
 
       toast.success('Klaim sengketa ditolak.');
@@ -195,8 +152,10 @@ export const DisputeManagement = () => {
 
     setIsProcessing(true);
     try {
-      await updateDisputeStatus(selectedId, 'review', currentUser?.email || 'admin@example.com', {
-        admin_note: adminNoteVal.trim()
+      await disputeService.resolveDispute(selectedId, {
+        decision: 'mediation',
+        notes: adminNoteVal.trim(),
+        decided_by: currentUser?.email || 'admin@example.com'
       });
 
       toast.success('Sengketa ditransfer ke mediator internal.');
@@ -205,6 +164,37 @@ export const DisputeManagement = () => {
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Gagal mentransfer sengketa');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReplacementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) return;
+    if (!adminNoteVal.trim()) {
+      toast.error('Catatan instruksi penggantian barang wajib diisi.');
+      return;
+    }
+
+    if (!window.confirm('Apakah Anda yakin ingin mewajibkan penggantian barang untuk komplain ini?')) {
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await disputeService.resolveDispute(selectedId, {
+        decision: 'replacement_required',
+        notes: adminNoteVal.trim(),
+        decided_by: currentUser?.email || 'admin@example.com'
+      });
+
+      toast.success('Keputusan penggantian barang berhasil disimpan.');
+      setActionType(null);
+      await fetchDisputes();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Gagal menyimpan keputusan');
     } finally {
       setIsProcessing(false);
     }
@@ -223,29 +213,68 @@ export const DisputeManagement = () => {
   });
 
   const getDisputeStatusLabel = (dispute: any) => {
-    const statusStr = (dispute.status || '').toUpperCase();
-    const resType = (dispute.resolution_type || '').toUpperCase();
-
-    if (statusStr === 'RESOLVED') {
-      if (resType === 'REFUNDED') return 'REFUNDED';
-      if (resType === 'REJECTED') return 'DITOLAK';
-      return 'SELESAI';
+    const statusStr = (dispute.status || '').toLowerCase();
+    
+    switch (statusStr) {
+      case 'submitted':
+        return 'Diajukan';
+      case 'awaiting_distributor_response':
+        return 'Menunggu Respon';
+      case 'under_admin_review':
+        return 'Ditinjau Admin';
+      case 'approved':
+        return 'Disetujui';
+      case 'rejected':
+        return 'Ditolak';
+      case 'resolved':
+        return 'Selesai';
+      case 'cancelled':
+        return 'Dibatalkan';
+      case 'open':
+        return 'Terbuka';
+      case 'in_mediation':
+        return 'Mediasi';
+      default:
+        // fallback legacy check
+        const statusUpper = (dispute.status || '').toUpperCase();
+        const resType = (dispute.resolution_type || '').toUpperCase();
+        if (statusUpper === 'RESOLVED') {
+          if (resType === 'REFUNDED') return 'REFUNDED';
+          if (resType === 'REJECTED') return 'DITOLAK';
+          return 'SELESAI';
+        }
+        if (statusUpper === 'IN_MEDIATION') return 'MEDIASI';
+        return dispute.status || 'TERBUKA';
     }
-    if (statusStr === 'IN_MEDIATION') return 'MEDIASI';
-    return 'TERBUKA';
   };
 
   const getDisputeStatusType = (dispute: any) => {
-    const statusStr = (dispute.status || '').toUpperCase();
-    const resType = (dispute.resolution_type || '').toUpperCase();
-
-    if (statusStr === 'RESOLVED') {
-      if (resType === 'REFUNDED') return 'success';
-      if (resType === 'REJECTED') return 'danger';
-      return 'success';
+    const statusStr = (dispute.status || '').toLowerCase();
+    
+    switch (statusStr) {
+      case 'submitted':
+        return 'info';
+      case 'awaiting_distributor_response':
+      case 'under_admin_review':
+      case 'in_mediation':
+        return 'warning';
+      case 'approved':
+      case 'resolved':
+        return 'success';
+      case 'rejected':
+      case 'cancelled':
+        return 'danger';
+      default:
+        const statusUpper = (dispute.status || '').toUpperCase();
+        const resType = (dispute.resolution_type || '').toUpperCase();
+        if (statusUpper === 'RESOLVED') {
+          if (resType === 'REFUNDED') return 'success';
+          if (resType === 'REJECTED') return 'danger';
+          return 'success';
+        }
+        if (statusUpper === 'IN_MEDIATION') return 'info';
+        return 'danger';
     }
-    if (statusStr === 'IN_MEDIATION') return 'info';
-    return 'danger';
   };
 
   // Replaced by shared formatDateTime from dateUtils — handles Firestore Timestamp, ISO string, and nulls
@@ -290,9 +319,15 @@ export const DisputeManagement = () => {
                       <p className="font-black text-xs uppercase tracking-widest">Memuat Sengketa...</p>
                    </div>
                 ) : filteredDisputes.length === 0 ? (
-                   <div className="text-center py-20 bg-card border border-dashed border-border/50 rounded-[2.5rem] text-sm font-bold text-muted-foreground">
-                      Belum ada pengajuan komplain atau refund.
-                   </div>
+                    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center bg-card border border-dashed border-border/50 rounded-[2.5rem]">
+                       <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground/50">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+                       </div>
+                       <div className="space-y-1.5 max-w-xs">
+                         <p className="text-sm font-black text-foreground">Belum ada sengketa untuk ditinjau.</p>
+                         <p className="text-xs font-medium text-muted-foreground">Laporan sengketa dan permintaan refund dari transaksi akan muncul di sini.</p>
+                       </div>
+                    </div>
                 ) : (
                    filteredDisputes.map((dispute) => (
                       <motion.div
@@ -394,74 +429,147 @@ export const DisputeManagement = () => {
                           Detail Permasalahan
                        </h3>
                        <div className="p-8 bg-muted/20 border border-border/30 rounded-[2rem] text-sm font-bold text-muted-foreground space-y-4 leading-relaxed">
-                          <p className="text-foreground">Alasan: {selected.reason}</p>
-                          {selected.evidence_note && (
-                            <p>Catatan Bukti: {selected.evidence_note}</p>
+                          {selected.title && (
+                            <p className="text-foreground">Judul Komplain: <span className="font-black">{selected.title}</span></p>
                           )}
-                          {selected.description && selected.description !== selected.reason && selected.description !== selected.evidence_note && (
-                            <p>Deskripsi Tambahan: {selected.description}</p>
+                          <p>Tipe Kendala: <span className="text-foreground font-black">
+                            {selected.type === 'damaged_item' ? 'Barang Rusak' :
+                             selected.type === 'wrong_item' ? 'Barang Tidak Sesuai' :
+                             selected.type === 'missing_quantity' ? 'Jumlah Kurang' :
+                             selected.type === 'not_received' ? 'Barang Tidak Diterima' :
+                             selected.type === 'late_delivery' ? 'Keterlambatan Pengiriman' : 'Lainnya'}
+                          </span></p>
+                          <p className="text-foreground">Alasan / Kronologi: {selected.description || selected.reason}</p>
+                          {selected.buyer_notes && (
+                            <p>Catatan Tambahan Pembeli: {selected.buyer_notes}</p>
                           )}
                           {selected.requested_resolution && (
-                            <p>Resolusi Diharapkan: <span className="text-[#A35139] capitalize font-black">{selected.requested_resolution === 'refund' ? 'Refund Dana' : selected.requested_resolution === 'replacement' ? 'Ganti Barang' : 'Tinjauan Admin'}</span></p>
+                            <p>Resolusi Diharapkan: <span className="text-[#A35139] capitalize font-black">
+                              {selected.requested_resolution === 'full_refund' ? 'Refund Penuh' : 
+                               selected.requested_resolution === 'partial_refund' ? 'Refund Sebagian' : 
+                               selected.requested_resolution === 'replacement' ? 'Penggantian Barang' : 
+                               selected.requested_resolution === 'discussion' ? 'Diskusi dengan Distributor' : 
+                               selected.requested_resolution === 'refund' ? 'Refund Dana' : 'Tinjauan Admin'}
+                            </span></p>
                           )}
+                          {selected.requested_refund_amount ? (
+                            <p>Jumlah Refund Diminta: <span className="text-[#A35139] font-black">Rp {selected.requested_refund_amount.toLocaleString('id-ID')}</span></p>
+                          ) : null}
                           {(selected.order_code || selected.order_id || selected.orderId) && (
                             <p>ID Pesanan: <span className="text-foreground font-black">#{selected.order_code || selected.order_id || selected.orderId}</span></p>
                           )}
                        </div>
                     </div>
 
-                    {(selected.evidence_url || selected.evidence_note) ? (
-                       <div className="space-y-6">
-                          <h3 className="text-xl font-black flex items-center gap-3">
-                             <FileText className="text-[#A35139]" />
-                             Bukti & Dokumen Pendukung
-                          </h3>
-                          {selected.evidence_url ? (
-                            <div className="flex flex-col gap-4">
-                              <div className="p-6 bg-muted/20 border border-border/30 rounded-2xl flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                  <FileText className="text-primary" size={24} />
-                                  <div className="text-left">
-                                    <p className="text-sm font-bold truncate max-w-xs">File Bukti Pengajuan</p>
-                                    <p className="text-[10px] text-muted-foreground">Dokumen pendukung terlampir</p>
+                    {((selected.evidence_urls && selected.evidence_urls.length > 0) || selected.evidence_url || selected.evidence_note) ? (
+                        <div className="space-y-6">
+                           <h3 className="text-xl font-black flex items-center gap-3">
+                              <FileText className="text-[#A35139]" />
+                              Bukti & Dokumen Pendukung
+                           </h3>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {selected.evidence_urls && selected.evidence_urls.map((url: string, idx: number) => {
+                                const isImg = url.match(/\.(jpeg|jpg|gif|png)/i) || url.includes('image') || !url.includes('.pdf');
+                                return (
+                                  <div key={idx} className="p-4 bg-muted/20 border border-border/30 rounded-2xl flex flex-col gap-3">
+                                    <div className="flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-2 truncate">
+                                        <FileText className="text-primary shrink-0" size={20} />
+                                        <span className="text-xs font-bold truncate">Bukti {idx + 1}</span>
+                                      </div>
+                                      <a 
+                                        href={url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-black rounded-lg transition-all shrink-0"
+                                      >
+                                        Buka Link
+                                      </a>
+                                    </div>
+                                    {isImg && (
+                                      <div className="border border-border/30 rounded-xl overflow-hidden aspect-video bg-muted">
+                                        <img src={url} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover" />
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
-                                <a 
-                                  href={selected.evidence_url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-black rounded-xl transition-all"
-                                >
-                                  Buka File
-                                </a>
-                              </div>
-                              {selected.evidence_url.match(/\.(jpeg|jpg|gif|png)/i) && (
-                                <div className="max-w-md border border-border/30 rounded-2xl overflow-hidden shadow-md">
-                                  <img src={selected.evidence_url} alt="Bukti Sengketa" className="w-full object-cover" />
+                                );
+                              })}
+                              {!selected.evidence_urls && selected.evidence_url && (
+                                <div className="p-4 bg-muted/20 border border-border/30 rounded-2xl flex flex-col gap-3 sm:col-span-2">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-2 truncate">
+                                      <FileText className="text-primary shrink-0" size={20} />
+                                      <span className="text-xs font-bold truncate">File Bukti Pengajuan</span>
+                                    </div>
+                                    <a 
+                                      href={selected.evidence_url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-black rounded-lg transition-all shrink-0"
+                                    >
+                                      Buka Link
+                                    </a>
+                                  </div>
+                                  {selected.evidence_url.match(/\.(jpeg|jpg|gif|png)/i) && (
+                                    <div className="border border-border/30 rounded-xl overflow-hidden max-w-md bg-muted">
+                                      <img src={selected.evidence_url} alt="Bukti" className="w-full object-cover" />
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                            </div>
-                          ) : (
-                            <div className="p-8 text-center bg-muted/10 border border-dashed border-border/50 rounded-2xl text-xs font-bold text-muted-foreground">
-                              Tidak ada lampiran file bukti.
-                            </div>
-                          )}
-                       </div>
-                    ) : (
-                       <div className="space-y-6">
-                          <h3 className="text-xl font-black flex items-center gap-3">
-                             <FileText className="text-[#A35139]" />
-                             Bukti & Dokumen Pendukung
-                          </h3>
-                          <div className="grid grid-cols-4 gap-4">
-                             {[1, 2, 3, 4].map(idx => (
-                               <div key={idx} className="aspect-square bg-muted/30 border border-dashed border-border/50 rounded-2xl flex items-center justify-center group cursor-pointer hover:border-[#A35139] transition-all">
-                                  <Package size={24} className="text-muted-foreground opacity-50 group-hover:text-[#A35139]" />
+                           </div>
+                        </div>
+                     ) : (
+                        <div className="p-8 text-center bg-muted/10 border border-dashed border-border/50 rounded-2xl text-xs font-bold text-muted-foreground">
+                          Tidak ada lampiran file bukti.
+                        </div>
+                     )}
+
+                     {/* Tanggapan Distributor */}
+                     {selected.distributor_response && (
+                       <div className="space-y-4 pt-4 border-t border-border/30">
+                         <h3 className="text-xl font-black flex items-center gap-3">
+                           <Building2 className="text-[#A35139]" size={20} />
+                           Respon Distributor
+                         </h3>
+                         <div className="p-8 bg-muted/20 border border-border/30 rounded-[2rem] text-sm font-bold text-muted-foreground space-y-4 leading-relaxed text-left">
+                           <p>
+                             Keputusan Distributor: <span className={`inline-block px-2.5 py-0.5 text-[10px] uppercase font-black tracking-wider rounded-full border ${
+                               selected.distributor_response.status === 'accepted' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                               selected.distributor_response.status === 'rejected' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
+                               'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                             }`}>
+                               {selected.distributor_response.status === 'accepted' ? 'Menerima Komplain' :
+                                selected.distributor_response.status === 'rejected' ? 'Menolak Komplain' :
+                                'Tinjauan Admin'}
+                             </span>
+                           </p>
+                           <p className="text-foreground">Pesan / Alasan: {selected.distributor_response.message}</p>
+                           <p className="text-[10px] text-muted-foreground font-normal">
+                             Ditanggapi oleh: {selected.distributor_response.responded_by} pada {formatDateTime(selected.distributor_response.responded_at)}
+                           </p>
+
+                           {selected.distributor_response.evidence_urls && selected.distributor_response.evidence_urls.length > 0 && (
+                             <div className="space-y-2 pt-2">
+                               <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-wider">Bukti Distributor</p>
+                               <div className="grid grid-cols-2 gap-2">
+                                 {selected.distributor_response.evidence_urls.map((url: string, idx: number) => (
+                                   <a 
+                                     key={idx} 
+                                     href={url} 
+                                     target="_blank" 
+                                     rel="noopener noreferrer" 
+                                     className="p-2 bg-card hover:bg-muted border border-border/50 rounded-xl text-[10px] font-bold text-center block truncate text-primary"
+                                   >
+                                     Bukti {idx + 1}
+                                   </a>
+                                 ))}
                                </div>
-                             ))}
-                          </div>
+                             </div>
+                           )}
+                         </div>
                        </div>
-                    )}
+                     )}
 
                     {selected.status === 'RESOLVED' ? (
                        <div className="p-8 bg-emerald-500/10 border border-emerald-500/20 rounded-[2.5rem] space-y-6">
@@ -524,18 +632,30 @@ export const DisputeManagement = () => {
                                       Tolak Klaim
                                    </Button>
                                 </div>
-                                <Button 
-                                  onClick={() => {
-                                    setActionType('mediation');
-                                    setAdminNoteVal('');
-                                  }}
-                                  variant="outline" 
-                                  className="w-full h-14 rounded-2xl border-border bg-card font-black uppercase text-xs tracking-widest flex gap-3 hover:bg-muted/50 transition-all cursor-pointer items-center justify-center"
-                                  disabled={isProcessing}
-                                >
-                                   <MessageSquareText size={18} />
-                                   Transfer ke Mediator Internal
-                                </Button>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <Button 
+                                    onClick={() => {
+                                      setActionType('replacement');
+                                      setAdminNoteVal('');
+                                    }}
+                                    className="h-14 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-sm shadow-xl shadow-amber-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                    disabled={isProcessing}
+                                  >
+                                     <Package size={20} />
+                                     Wajibkan Ganti Barang
+                                  </Button>
+                                  <Button 
+                                    onClick={() => {
+                                      setActionType('mediation');
+                                      setAdminNoteVal('');
+                                    }}
+                                    className="h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm shadow-xl shadow-blue-500/20 flex gap-3 cursor-pointer items-center justify-center animate-hover"
+                                    disabled={isProcessing}
+                                  >
+                                     <MessageSquareText size={20} />
+                                     Lanjut Mediasi
+                                  </Button>
+                                </div>
                              </div>
                           ) : actionType === 'refund' ? (
                              <form onSubmit={handleRefundSubmit} className="p-8 bg-emerald-500/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6">
@@ -625,6 +745,45 @@ export const DisputeManagement = () => {
                                     className="flex-1 h-12 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold uppercase text-xs tracking-wider flex gap-2 items-center justify-center shadow-lg shadow-rose-500/10"
                                   >
                                     {isProcessing ? <Loader2 className="animate-spin" size={16} /> : 'Kirim Penolakan'}
+                                  </Button>
+                                </div>
+                             </form>
+                          ) : actionType === 'replacement' ? (
+                             <form onSubmit={handleReplacementSubmit} className="p-8 bg-amber-500/5 border border-amber-500/20 rounded-[2.5rem] space-y-6">
+                                <h4 className="text-lg font-black text-amber-500 flex items-center gap-2">
+                                  <Package size={20} /> Form Keputusan Ganti Barang
+                                </h4>
+                                
+                                <div className="space-y-2">
+                                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    Instruksi / Catatan Penggantian Barang <span className="text-rose-500">*</span>
+                                  </label>
+                                  <textarea 
+                                    required
+                                    value={adminNoteVal}
+                                    onChange={(e) => setAdminNoteVal(e.target.value)}
+                                    placeholder="Jelaskan instruksi pengembalian barang rusak dan pengiriman produk pengganti..."
+                                    rows={4}
+                                    className="w-full bg-card border border-border/60 rounded-[1.25rem] p-6 text-sm font-bold outline-none focus:border-primary/40 focus:bg-card transition-all resize-none"
+                                  />
+                                </div>
+
+                                <div className="flex gap-4">
+                                  <Button 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={() => setActionType(null)}
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl border-border font-bold uppercase text-xs tracking-wider"
+                                  >
+                                    Batal
+                                  </Button>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase text-xs tracking-wider flex gap-2 items-center justify-center shadow-lg shadow-amber-500/10"
+                                  >
+                                    {isProcessing ? <Loader2 className="animate-spin" size={16} /> : 'Kirim Keputusan'}
                                   </Button>
                                 </div>
                              </form>

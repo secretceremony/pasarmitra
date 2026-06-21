@@ -240,7 +240,7 @@ export const AuditLogSystem = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {/* Card 1 */}
-        <div className="bg-card p-8 rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="bg-card p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
           <div className="flex justify-between items-start">
             <div className="p-4 bg-primary/10 rounded-2xl text-primary">
               <Database size={24} />
@@ -254,7 +254,7 @@ export const AuditLogSystem = () => {
         </div>
         
         {/* Card 2 */}
-        <div className="bg-card p-8 rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="bg-card p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
           <div className="flex justify-between items-start">
             <div className="p-4 bg-sky-500/10 rounded-2xl text-sky-500">
               <Clock size={24} />
@@ -268,7 +268,7 @@ export const AuditLogSystem = () => {
         </div>
 
         {/* Card 3 */}
-        <div className="bg-card p-8 rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="bg-card p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
           <div className="flex justify-between items-start">
             <div className="p-4 bg-amber-500/10 rounded-2xl text-amber-500">
               <ShieldAlert size={24} />
@@ -282,7 +282,7 @@ export const AuditLogSystem = () => {
         </div>
 
         {/* Card 4 */}
-        <div className="bg-card p-8 rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="bg-card p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-border/50 space-y-6 shadow-xl relative overflow-hidden">
           <div className="flex justify-between items-start">
             <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-500">
               <Settings size={24} />
@@ -297,8 +297,8 @@ export const AuditLogSystem = () => {
       </div>
 
       {/* Log Feed */}
-      <div className="bg-card border border-border/50 rounded-[3.5rem] overflow-hidden shadow-2xl">
-        <div className="p-10 border-b border-border/50 flex flex-col lg:flex-row gap-6 justify-between bg-muted/5 backdrop-blur-3xl">
+      <div className="bg-card border border-border/50 rounded-[2rem] sm:rounded-[3.5rem] overflow-hidden shadow-2xl">
+        <div className="p-6 lg:p-10 border-b border-border/50 flex flex-col lg:flex-row gap-6 justify-between bg-muted/5 backdrop-blur-3xl">
           <div className="flex-1 relative group">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
             <input 
@@ -372,8 +372,16 @@ export const AuditLogSystem = () => {
                 </tr>
               ) : filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-20 text-center text-sm font-bold text-muted-foreground">
-                    Tidak ada log aktivitas administratif yang cocok dengan filter.
+                  <td colSpan={8} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                      <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground/40">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-black text-foreground">Tidak ada log yang cocok.</p>
+                        <p className="text-xs font-medium text-muted-foreground">Tidak ada log aktivitas administratif yang sesuai dengan filter yang dipilih.</p>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -394,7 +402,7 @@ export const AuditLogSystem = () => {
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 bg-muted rounded-full flex items-center justify-center text-muted-foreground">
+                          <div className="w-7 h-7 bg-muted rounded-lg flex items-center justify-center text-muted-foreground">
                             <User size={13} />
                           </div>
                           <span className="text-sm font-bold italic text-foreground block max-w-[160px] truncate" title={log.user}>

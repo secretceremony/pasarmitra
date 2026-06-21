@@ -94,8 +94,22 @@ export const MyPartners = () => {
                 Memuat daftar mitra...
               </div>
             ) : partnerships.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground bg-card border border-border/50 rounded-[3rem] font-bold">
-                Belum ada kemitraan aktif. Klik "Cari Mitra Baru" untuk berjejaring.
+              <div className="flex flex-col items-center justify-center gap-5 py-16 text-center bg-card border border-dashed border-border/60 rounded-[3rem]">
+                <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground/50">
+                  <Building2 size={30} strokeWidth={1.5} />
+                </div>
+                <div className="space-y-1.5 max-w-sm">
+                  <p className="text-base font-black text-foreground">Belum ada kemitraan aktif.</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Temukan distributor terpercaya di marketplace dan mulai jalin kemitraan grosir Anda.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => navigate('/marketplace')}
+                  className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black text-xs uppercase tracking-wider shadow-lg shadow-primary/20"
+                >
+                  Cari Mitra Baru
+                </Button>
               </div>
             ) : (
               partnerships.map((partner, i) => {
@@ -121,7 +135,7 @@ export const MyPartners = () => {
                            <ReputationBadge score={profile?.reputation_score || 4.5} size="sm" />
                         </div>
                         <div className="flex items-center gap-6 text-muted-foreground font-bold text-sm">
-                           <span className="flex items-center gap-2"><MapPin size={16} /> Bandung, Jawa Barat</span>
+                           <span className="flex items-center gap-2"><MapPin size={16} /> {(profile as any)?.address || 'Balikpapan, Kalimantan Timur'}</span>
                            <span className="flex items-center gap-2 text-primary uppercase text-[10px] tracking-widest">
                              {isDist ? 'Mitra UMKM' : 'Platinum Partner'}
                            </span>

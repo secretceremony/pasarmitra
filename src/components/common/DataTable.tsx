@@ -6,7 +6,9 @@ import {
   Filter, 
   MoreHorizontal,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  SearchX,
+  Inbox
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,14 +25,18 @@ interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
   searchPlaceholder?: string;
   actions?: (item: T) => React.ReactNode;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
 export function DataTable<T extends { id: string | number }>({ 
   columns, 
   data, 
   onRowClick,
-  searchPlaceholder = "Search...",
-  actions
+  searchPlaceholder = "Cari data...",
+  actions,
+  emptyTitle,
+  emptyDescription,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof T; direction: 'asc' | 'desc' } | null>(null);
@@ -137,15 +143,29 @@ export function DataTable<T extends { id: string | number }>({
           </table>
         </div>
         {sortedData.length === 0 && (
-          <div className="py-20 text-center text-muted-foreground">
-            No results found matching your search.
+          <div className="py-16 flex flex-col items-center justify-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground/50">
+              {searchTerm ? <SearchX size={22} strokeWidth={1.5} /> : <Inbox size={22} strokeWidth={1.5} />}
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-black text-foreground">
+                {searchTerm
+                  ? (emptyTitle ?? 'Tidak ada hasil yang cocok')
+                  : (emptyTitle ?? 'Belum ada data')}
+              </p>
+              <p className="text-xs font-medium text-muted-foreground">
+                {searchTerm
+                  ? (emptyDescription ?? 'Coba kata kunci lain atau ubah filter pencarian Anda.')
+                  : (emptyDescription ?? 'Data akan muncul di sini setelah tersedia.')}
+              </p>
+            </div>
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-between px-2">
         <p className="text-xs text-muted-foreground">
-          Showing <span className="font-medium">{sortedData.length}</span> of <span className="font-medium">{data.length}</span> results
+          Menampilkan <span className="font-medium">{sortedData.length}</span> dari <span className="font-medium">{data.length}</span> data
         </p>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" disabled className="rounded-lg h-8 w-8">

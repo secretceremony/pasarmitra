@@ -33,6 +33,7 @@ export const ModerationSystem = () => {
   const { user: currentUser } = useAuthStore();
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [detailItem, setDetailItem] = useState<any | null>(null);
 
   const fetchModerationItems = async () => {
     try {
@@ -559,7 +560,7 @@ export const ModerationSystem = () => {
       </div>
 
       {/* Compact Search & Filter Controls */}
-      <div className="bg-card border border-border/50 p-4 rounded-2xl flex flex-col md:flex-row gap-4 shadow-lg items-center">
+      <div className="bg-card border border-border/50 p-4 rounded-2xl flex flex-col md:flex-row gap-4 shadow-lg items-stretch md:items-center">
          <div className="flex-1 relative group w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
             <input 
@@ -570,21 +571,21 @@ export const ModerationSystem = () => {
               onChange={(e) => setSearch(e.target.value)}
             />
          </div>
-         <div className="flex gap-4 items-center shrink-0 w-full md:w-auto justify-between md:justify-end">
-            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-muted-foreground hover:text-foreground">
+         <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-center justify-between w-full md:w-auto shrink-0">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-muted-foreground hover:text-foreground w-full sm:w-auto">
                <input 
                  type="checkbox" 
                  checked={showResolved}
                  onChange={(e) => setShowResolved(e.target.checked)}
-                 className="w-4 h-4 rounded border-border/40 text-primary focus:ring-primary/40"
+                 className="w-4 h-4 rounded border-border/40 text-primary focus:ring-primary/40 cursor-pointer"
                />
                Tampilkan Riwayat Moderasi
             </label>
-            <div className="flex bg-muted/40 p-1 rounded-xl border border-border/30 h-11">
+            <div className="flex bg-muted/40 p-1 rounded-xl border border-border/30 h-11 w-full sm:w-auto justify-center sm:justify-end shrink-0">
                <Button 
                  variant="ghost" 
                  size="icon"
-                 className={cn("h-full w-10 rounded-lg transition-all", viewMode === 'GRID' ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")} 
+                 className={cn("h-full w-10 flex-1 sm:flex-initial rounded-lg transition-all", viewMode === 'GRID' ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")} 
                  onClick={() => setViewMode('GRID')}
                  title="Tampilan Grid"
                  aria-label="Tampilan Grid"
@@ -594,7 +595,7 @@ export const ModerationSystem = () => {
                <Button 
                  variant="ghost" 
                  size="icon"
-                 className={cn("h-full w-10 rounded-lg transition-all", viewMode === 'LIST' ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")} 
+                 className={cn("h-full w-10 flex-1 sm:flex-initial rounded-lg transition-all", viewMode === 'LIST' ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")} 
                  onClick={() => setViewMode('LIST')}
                  title="Tampilan List"
                  aria-label="Tampilan List"
@@ -639,7 +640,8 @@ export const ModerationSystem = () => {
       ) : (
         viewMode === 'LIST' ? (
           <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-lg">
-             <div className="overflow-x-auto">
+             {/* Desktop Widescreen Table View */}
+             <div className="overflow-x-auto hidden md:block">
                 <table className="w-full border-collapse min-w-[900px]">
                     <thead>
                        <tr className="border-b border-border/50 bg-muted/20">
@@ -651,207 +653,408 @@ export const ModerationSystem = () => {
                           <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">Aksi</th>
                        </tr>
                     </thead>
-                   <tbody className="divide-y divide-border/20">
+                    <tbody className="divide-y divide-border/20">
                        {sortedFilteredItems.map((item, i) => {
-                         const resolved = isItemResolved(item);
-                         const isProduct = (item.targetType ?? item.type)?.toUpperCase() === 'PRODUCT';
-                         return (
-                           <motion.tr 
-                             key={item.id}
-                             initial={{ opacity: 0, x: -10 }}
-                             animate={{ opacity: 1, x: 0 }}
-                             transition={{ delay: i * 0.05 }}
-                             className={cn(
-                               "group transition-all border-b border-border/30 last:border-none",
-                               resolved ? "bg-muted/10 opacity-70 hover:opacity-100" : "hover:bg-muted/10"
-                             )}
-                           >
-                              <td className="px-6 py-4">
-                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-lg bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
-                                       {isProduct && item.image ? (
-                                         <img src={item.image} alt="" className="w-full h-full object-cover" />
-                                       ) : (
-                                         isProduct ? (
-                                           <Box size={20} className="text-muted-foreground/45" />
-                                         ) : (
-                                           <MessageSquare size={20} className="text-muted-foreground/45" />
-                                         )
-                                       )}
-                                    </div>
-                                    <div className="flex flex-col">
-                                       <span className="font-black text-sm text-foreground">{item.title}</span>
-                                       {item.content && (
-                                         <span className="text-xs text-muted-foreground line-clamp-1 italic">"{item.content}"</span>
-                                       )}
-                                    </div>
+                          const resolved = isItemResolved(item);
+                          const isProduct = (item.targetType ?? item.type)?.toUpperCase() === 'PRODUCT';
+                          return (
+                            <motion.tr 
+                              key={item.id}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: i * 0.05 }}
+                              className={cn(
+                                "group transition-all border-b border-border/30 last:border-none",
+                                resolved ? "bg-muted/10 opacity-70 hover:opacity-100" : "hover:bg-muted/10"
+                              )}
+                            >
+                               <td className="px-6 py-4">
+                                  <div className="flex items-center gap-4">
+                                     <div className="w-12 h-12 rounded-lg bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                                        {isProduct && item.image ? (
+                                          <img src={item.image} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                          isProduct ? (
+                                            <Box size={20} className="text-muted-foreground/45" />
+                                          ) : (
+                                            <MessageSquare size={20} className="text-muted-foreground/45" />
+                                          )
+                                        )}
+                                     </div>
+                                     <div className="flex flex-col">
+                                        <span className="font-black text-sm text-foreground">{item.title}</span>
+                                        {item.content && (
+                                          <span className="text-xs text-muted-foreground line-clamp-1 italic">"{item.content}"</span>
+                                        )}
+                                     </div>
                                   </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                 <StatusBadge 
-                                   type={getItemTypeBadgeType(item)} 
-                                   label={getItemTypeLabel(item)} 
-                                 />
-                              </td>
-                              <td className="px-6 py-4">
-                                 <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-foreground">{item.author}</span>
-                                    {item.reason && (
-                                      <span className="text-[10px] font-medium text-rose-500">{item.reason}</span>
-                                    )}
-                                    {item.note && (
-                                      <span className="text-[10px] font-medium text-muted-foreground italic mt-0.5">Catatan: {item.note}</span>
-                                    )}
-                                 </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                 <StatusBadge 
-                                   type={getStatusBadgeType(item.status)} 
-                                   label={getStatusLabelInIndonesian(item.status)} 
-                                 />
-                              </td>
-                              <td className="px-6 py-4 text-xs font-bold text-muted-foreground">
-                                 {item.timestamp}
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                 <div className="flex justify-end items-center gap-2">
-                                    {resolved ? (
-                                       <>
-                                         <Button 
-                                           variant="outline" 
-                                           size="sm"
-                                           className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
-                                           onClick={() => handleRestore(item.id)}
-                                           disabled={actionInProgress !== null}
-                                         >
-                                           {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
-                                           Pulihkan
-                                         </Button>
-                                         <Button 
-                                           variant="outline" 
-                                           size="sm"
-                                           className="h-8 px-3 rounded-lg text-amber-500 border-amber-500/25 hover:bg-amber-500/5 text-xs font-bold transition-all"
-                                           onClick={() => handleReopen(item.id)}
-                                           disabled={actionInProgress !== null}
-                                         >
-                                           {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-amber-500 mr-1" /> : null}
-                                           Buka Ulang
-                                         </Button>
-                                       </>
-                                    ) : (
-                                       <>
-                                         {/* Pending Product approval actions */}
-                                         {isProductPendingApproval(item) && (
-                                           <>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
-                                               onClick={() => handleApproveProduct(item.id)}
-                                               disabled={actionInProgress !== null}
-                                             >
-                                               {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
-                                               Setujui Produk
-                                             </Button>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all"
-                                               onClick={() => handleRejectProduct(item.id)}
-                                               disabled={actionInProgress !== null}
-                                             >
-                                               {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
-                                               Tolak Produk
-                                             </Button>
-                                           </>
-                                         )}
-                                         
-                                         {/* Reported Product actions */}
-                                         {isProductReported(item) && (
-                                           <>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all"
-                                               onClick={() => {
-                                                 const details = `Detail Laporan Produk:\n\nProduk: ${item.title}\nID: ${item.targetId || item.id}\nPengaju/Distributor: ${item.author}\nAlasan Laporan: ${item.reason}\n\nCatatan Tambahan: ${item.note || '-'}`;
-                                                 alert(details);
-                                               }}
-                                             >
-                                               Detail
-                                             </Button>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all"
-                                               onClick={() => handleHideProduct(item.id)}
-                                               disabled={actionInProgress !== null}
-                                             >
-                                               {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
-                                               Sembunyikan Produk
-                                             </Button>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
-                                               onClick={() => handleResolveReport(item.id)}
-                                               disabled={actionInProgress !== null}
-                                             >
-                                               {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
-                                               Tandai Selesai
-                                             </Button>
-                                           </>
-                                         )}
+                               </td>
+                               <td className="px-6 py-4">
+                                  <StatusBadge 
+                                    type={getItemTypeBadgeType(item)} 
+                                    label={getItemTypeLabel(item)} 
+                                  />
+                               </td>
+                               <td className="px-6 py-4">
+                                  <div className="flex flex-col">
+                                     <span className="text-xs font-bold text-foreground">{item.author}</span>
+                                     {item.reason && (
+                                       <span className="text-[10px] font-medium text-rose-500">{item.reason}</span>
+                                     )}
+                                     {item.note && (
+                                       <span className="text-[10px] font-medium text-muted-foreground italic mt-0.5">Catatan: {item.note}</span>
+                                     )}
+                                  </div>
+                               </td>
+                               <td className="px-6 py-4">
+                                  <StatusBadge 
+                                    type={getStatusBadgeType(item.status)} 
+                                    label={getStatusLabelInIndonesian(item.status)} 
+                                  />
+                               </td>
+                               <td className="px-6 py-4 text-xs font-bold text-muted-foreground">
+                                  {item.timestamp}
+                               </td>
+                               <td className="px-6 py-4 text-right">
+                                  <div className="flex justify-end items-center gap-2">
+                                     {resolved ? (
+                                        <>
+                                          <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
+                                            onClick={() => handleRestore(item.id)}
+                                            disabled={actionInProgress !== null}
+                                          >
+                                            {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                            Pulihkan
+                                          </Button>
+                                          <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            className="h-8 px-3 rounded-lg text-amber-500 border-amber-500/25 hover:bg-amber-500/5 text-xs font-bold transition-all"
+                                            onClick={() => handleReopen(item.id)}
+                                            disabled={actionInProgress !== null}
+                                          >
+                                            {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-amber-500 mr-1" /> : null}
+                                            Buka Ulang
+                                          </Button>
+                                        </>
+                                     ) : (
+                                        <>
+                                          {/* Pending Product approval actions */}
+                                          {isProductPendingApproval(item) && (
+                                            <>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
+                                                onClick={() => handleApproveProduct(item.id)}
+                                                disabled={actionInProgress !== null}
+                                              >
+                                                {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                                Setujui Produk
+                                              </Button>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all"
+                                                onClick={() => handleRejectProduct(item.id)}
+                                                disabled={actionInProgress !== null}
+                                              >
+                                                {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
+                                                Tolak Produk
+                                              </Button>
+                                            </>
+                                          )}
+                                          
+                                          {/* Reported Product actions */}
+                                          {isProductReported(item) && (
+                                            <>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all"
+                                                onClick={() => setDetailItem(item)}
+                                              >
+                                                Detail
+                                              </Button>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all"
+                                                onClick={() => handleHideProduct(item.id)}
+                                                disabled={actionInProgress !== null}
+                                              >
+                                                {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
+                                                Sembunyikan Produk
+                                              </Button>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
+                                                onClick={() => handleResolveReport(item.id)}
+                                                disabled={actionInProgress !== null}
+                                              >
+                                                {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                                Tandai Selesai
+                                              </Button>
+                                            </>
+                                          )}
 
-                                         {/* Reported Review actions */}
-                                         {isReviewReported(item) && (
-                                           <>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all"
-                                               onClick={() => {
-                                                 const details = `Detail Laporan Ulasan:\n\nUlasan untuk: ${item.title}\nID: ${item.targetId || item.id}\nPenulis: ${item.author}\nAlasan Laporan: ${item.reason}\nKonten Ulasan: "${item.content || ''}"`;
-                                                 alert(details);
-                                               }}
-                                             >
-                                               Detail
-                                             </Button>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all"
-                                               onClick={() => handleHideReview(item.id)}
-                                               disabled={actionInProgress !== null}
-                                             >
-                                               {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
-                                               Sembunyikan Ulasan
-                                             </Button>
-                                             <Button 
-                                               variant="outline" 
-                                               size="sm"
-                                               className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
-                                               onClick={() => handleResolveReport(item.id)}
-                                               disabled={actionInProgress !== null}
-                                             >
-                                               {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
-                                               Tandai Selesai
-                                             </Button>
-                                           </>
-                                         )}
-                                       </>
-                                    )}
-                                 </div>
-                              </td>
-                           </motion.tr>
-                         );
-                       })}
-                   </tbody>
-                </table>
+                                          {/* Reported Review actions */}
+                                          {isReviewReported(item) && (
+                                            <>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all"
+                                                onClick={() => setDetailItem(item)}
+                                              >
+                                                Detail
+                                              </Button>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all"
+                                                onClick={() => handleHideReview(item.id)}
+                                                disabled={actionInProgress !== null}
+                                              >
+                                                {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
+                                                Sembunyikan Ulasan
+                                              </Button>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="h-8 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all"
+                                                onClick={() => handleResolveReport(item.id)}
+                                                disabled={actionInProgress !== null}
+                                              >
+                                                {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                                Tandai Selesai
+                                              </Button>
+                                            </>
+                                          )}
+                                        </>
+                                     )}
+                                  </div>
+                               </td>
+                            </motion.tr>
+                          );
+                        })}
+                    </tbody>
+                 </table>
+             </div>
+
+             {/* Mobile Stacked Card View for List Mode */}
+             <div className="block md:hidden divide-y divide-border/20">
+                {sortedFilteredItems.map((item, i) => {
+                   const resolved = isItemResolved(item);
+                   const isProduct = (item.targetType ?? item.type)?.toUpperCase() === 'PRODUCT';
+                   return (
+                     <motion.div
+                       key={item.id}
+                       initial={{ opacity: 0, y: 10 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       transition={{ delay: i * 0.03 }}
+                       className={cn(
+                         "p-4 flex flex-col gap-3 transition-all",
+                         resolved ? "bg-muted/5 opacity-70" : "bg-card"
+                       )}
+                     >
+                        {/* Header: Type and Status */}
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                           <StatusBadge 
+                             type={getItemTypeBadgeType(item)} 
+                             label={getItemTypeLabel(item)} 
+                           />
+                           <StatusBadge 
+                             type={getStatusBadgeType(item.status)} 
+                             label={getStatusLabelInIndonesian(item.status)} 
+                           />
+                        </div>
+
+                        {/* Title and Image */}
+                        <div className="flex items-start gap-3 min-w-0">
+                           <div className="w-12 h-12 rounded-lg bg-muted/30 flex items-center justify-center overflow-hidden shrink-0 border border-border/30">
+                              {isProduct && item.image ? (
+                                <img src={item.image} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                isProduct ? (
+                                  <Box size={20} className="text-muted-foreground/45" />
+                                ) : (
+                                  <MessageSquare size={20} className="text-muted-foreground/45" />
+                                )
+                              )}
+                           </div>
+                           <div className="flex-1 min-w-0 space-y-1">
+                              <h4 className="font-black text-sm text-foreground break-words leading-snug">{item.title}</h4>
+                              {item.content && (
+                                <p className="text-xs text-muted-foreground italic break-words leading-normal">
+                                   "{item.content}"
+                                </p>
+                              )}
+                           </div>
+                        </div>
+
+                        {/* Submitter & Reason & Date info */}
+                        <div className="bg-muted/20 rounded-xl p-3 text-xs space-y-1.5 border border-border/30">
+                           <div className="flex items-start gap-1 min-w-0">
+                              <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider w-24 shrink-0">Pengaju:</span>
+                              <span className="font-bold text-foreground truncate">{item.author}</span>
+                           </div>
+                           {item.reason && (
+                              <div className="flex items-start gap-1 min-w-0">
+                                 <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider w-24 shrink-0">Alasan:</span>
+                                 <span className="font-bold text-rose-500 break-words flex-1">{item.reason}</span>
+                              </div>
+                           )}
+                           {item.note && (
+                              <div className="flex items-start gap-1 min-w-0">
+                                 <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider w-24 shrink-0">Catatan:</span>
+                                 <span className="font-medium text-muted-foreground italic break-words flex-1">{item.note}</span>
+                              </div>
+                           )}
+                           <div className="flex items-start gap-1 min-w-0 border-t border-border/20 pt-1.5 mt-1">
+                              <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider w-24 shrink-0">Tanggal:</span>
+                              <span className="font-bold text-muted-foreground">{item.timestamp}</span>
+                           </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap gap-2 mt-1 justify-end">
+                           {resolved ? (
+                              <>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="h-9 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all flex-1"
+                                  onClick={() => handleRestore(item.id)}
+                                  disabled={actionInProgress !== null}
+                                >
+                                  {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                  Pulihkan
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="h-9 px-3 rounded-lg text-amber-500 border-amber-500/25 hover:bg-amber-500/5 text-xs font-bold transition-all flex-1"
+                                  onClick={() => handleReopen(item.id)}
+                                  disabled={actionInProgress !== null}
+                                >
+                                  {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-amber-500 mr-1" /> : null}
+                                  Buka Ulang
+                                </Button>
+                              </>
+                           ) : (
+                              <div className="flex flex-col gap-2 w-full">
+                                 {/* Pending Product approval actions */}
+                                 {isProductPendingApproval(item) && (
+                                   <div className="flex gap-2 w-full">
+                                     <Button 
+                                       variant="outline" 
+                                       size="sm"
+                                       className="h-9 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all flex-1"
+                                       onClick={() => handleApproveProduct(item.id)}
+                                       disabled={actionInProgress !== null}
+                                     >
+                                       {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                       Setujui Produk
+                                     </Button>
+                                     <Button 
+                                       variant="outline" 
+                                       size="sm"
+                                       className="h-9 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all flex-1"
+                                       onClick={() => handleRejectProduct(item.id)}
+                                       disabled={actionInProgress !== null}
+                                     >
+                                       {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
+                                       Tolak Produk
+                                     </Button>
+                                   </div>
+                                 )}
+
+                                 {/* Reported Product actions */}
+                                 {isProductReported(item) && (
+                                   <div className="flex flex-col gap-2 w-full">
+                                     <div className="flex gap-2 w-full">
+                                       <Button 
+                                         variant="outline" 
+                                         size="sm"
+                                         className="h-9 px-3 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all flex-1"
+                                         onClick={() => setDetailItem(item)}
+                                       >
+                                         Detail
+                                       </Button>
+                                       <Button 
+                                         variant="outline" 
+                                         size="sm"
+                                         className="h-9 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all flex-1"
+                                         onClick={() => handleResolveReport(item.id)}
+                                         disabled={actionInProgress !== null}
+                                       >
+                                         {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                         Tandai Selesai
+                                       </Button>
+                                     </div>
+                                     <Button 
+                                       variant="outline" 
+                                       size="sm"
+                                       className="h-9 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all w-full"
+                                       onClick={() => handleHideProduct(item.id)}
+                                       disabled={actionInProgress !== null}
+                                     >
+                                       {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
+                                       Sembunyikan Produk
+                                     </Button>
+                                   </div>
+                                 )}
+
+                                 {/* Reported Review actions */}
+                                 {isReviewReported(item) && (
+                                   <div className="flex flex-col gap-2 w-full">
+                                     <div className="flex gap-2 w-full">
+                                       <Button 
+                                         variant="outline" 
+                                         size="sm"
+                                         className="h-9 px-3 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all flex-1"
+                                         onClick={() => setDetailItem(item)}
+                                       >
+                                         Detail
+                                       </Button>
+                                       <Button 
+                                         variant="outline" 
+                                         size="sm"
+                                         className="h-9 px-3 rounded-lg text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/5 text-xs font-bold transition-all flex-1"
+                                         onClick={() => handleResolveReport(item.id)}
+                                         disabled={actionInProgress !== null}
+                                       >
+                                         {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-emerald-500 mr-1" /> : null}
+                                         Tandai Selesai
+                                       </Button>
+                                     </div>
+                                     <Button 
+                                       variant="outline" 
+                                       size="sm"
+                                       className="h-9 px-3 rounded-lg text-rose-500 border-rose-500/25 hover:bg-rose-500/5 text-xs font-bold transition-all w-full"
+                                       onClick={() => handleHideReview(item.id)}
+                                       disabled={actionInProgress !== null}
+                                     >
+                                       {actionInProgress === item.id ? <Loader2 size={12} className="animate-spin text-rose-500 mr-1" /> : null}
+                                       Sembunyikan Ulasan
+                                     </Button>
+                                   </div>
+                                 )}
+                              </div>
+                           )}
+                        </div>
+                     </motion.div>
+                   );
+                })}
              </div>
           </div>
         ) : (
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
              {sortedFilteredItems.map((item, i) => {
                 const resolved = isItemResolved(item);
                 const isProduct = (item.targetType ?? item.type)?.toUpperCase() === 'PRODUCT';
@@ -868,8 +1071,8 @@ export const ModerationSystem = () => {
                   >
                      {/* Severity Indicator Strip */}
                      <div className={cn(
-                       "absolute top-0 left-0 w-full h-1.5",
-                       item.severity === 'HIGH' ? "bg-rose-500" : "bg-amber-500"
+                        "absolute top-0 left-0 w-full h-1.5",
+                        item.severity === 'HIGH' ? "bg-rose-500" : "bg-amber-500"
                      )} />
 
                      {/* Resource Preview */}
@@ -898,7 +1101,7 @@ export const ModerationSystem = () => {
                      </div>
 
                      {/* Info Content */}
-                     <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                     <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4">
                         <div className="space-y-2">
                            <div className="flex items-start justify-between gap-2">
                               <h3 className="text-base font-black tracking-tight leading-tight text-foreground line-clamp-2">{item.title}</h3>
@@ -984,10 +1187,7 @@ export const ModerationSystem = () => {
                                           <Button 
                                             variant="outline" 
                                             className="h-10 px-4 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all flex-1"
-                                            onClick={() => {
-                                              const details = `Detail Laporan Produk:\n\nProduk: ${item.title}\nID: ${item.targetId || item.id}\nPengaju/Distributor: ${item.author}\nAlasan Laporan: ${item.reason}\n\nCatatan Tambahan: ${item.note || '-'}`;
-                                              alert(details);
-                                            }}
+                                            onClick={() => setDetailItem(item)}
                                           >
                                             Detail
                                           </Button>
@@ -1020,10 +1220,7 @@ export const ModerationSystem = () => {
                                           <Button 
                                             variant="outline" 
                                             className="h-10 px-4 rounded-lg text-primary border-primary/25 hover:bg-primary/5 text-xs font-bold transition-all flex-1"
-                                            onClick={() => {
-                                              const details = `Detail Laporan Ulasan:\n\nUlasan untuk: ${item.title}\nID: ${item.targetId || item.id}\nPenulis: ${item.author}\nAlasan Laporan: ${item.reason}\nKonten Ulasan: "${item.content || ''}"`;
-                                              alert(details);
-                                            }}
+                                            onClick={() => setDetailItem(item)}
                                           >
                                             Detail
                                           </Button>
@@ -1057,6 +1254,105 @@ export const ModerationSystem = () => {
              })}
           </div>
         )
+      )}
+      {/* Custom Details Modal */}
+      {detailItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+           {/* Modal Box */}
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-card border border-border shadow-2xl rounded-2xl w-[90vw] max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+           >
+              {/* Modal Header */}
+              <div className="p-5 border-b border-border/50 flex items-center justify-between bg-muted/10">
+                 <div className="flex items-center gap-2">
+                    <AlertTriangle className="text-amber-500" size={20} />
+                    <h3 className="font-black text-lg text-foreground tracking-tight">Detail Moderasi</h3>
+                 </div>
+                 <button 
+                   onClick={() => setDetailItem(null)}
+                   className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                 >
+                    <XCircle size={20} />
+                 </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-4 text-sm scrollbar-thin">
+                 <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Tipe Item</span>
+                    <div className="mt-1">
+                       <StatusBadge type={getItemTypeBadgeType(detailItem)} label={getItemTypeLabel(detailItem)} />
+                    </div>
+                 </div>
+
+                 <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                       {(detailItem.targetType ?? detailItem.type)?.toUpperCase() === 'PRODUCT' ? 'Nama Produk' : 'Ulasan Untuk'}
+                    </span>
+                    <p className="font-bold text-foreground mt-0.5 break-words text-sm leading-snug">{detailItem.title}</p>
+                 </div>
+
+                 <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">ID Target / Laporan</span>
+                    <p className="font-mono text-xs text-muted-foreground mt-0.5 break-all">{detailItem.targetId || detailItem.id}</p>
+                 </div>
+
+                 <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Pengaju / Distributor</span>
+                    <p className="font-bold text-foreground mt-0.5 break-words">{detailItem.author}</p>
+                 </div>
+
+                 {detailItem.reason && (
+                   <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Alasan Laporan</span>
+                      <p className="text-rose-500 font-bold mt-0.5 break-words">{detailItem.reason}</p>
+                   </div>
+                 )}
+
+                 {detailItem.content && (
+                   <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Konten Ulasan</span>
+                      <p className="bg-muted/40 border border-border/30 p-3 rounded-xl font-medium italic text-muted-foreground mt-1 break-words leading-relaxed">
+                         "{detailItem.content}"
+                      </p>
+                   </div>
+                 )}
+
+                 <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Catatan Tambahan</span>
+                    <p className="bg-muted/40 border border-border/30 p-3 rounded-xl font-medium text-muted-foreground mt-1 break-words">
+                       {detailItem.note || '-'}
+                    </p>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4 border-t border-border/30 pt-4">
+                    <div>
+                       <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Waktu Dibuat</span>
+                       <p className="font-bold text-foreground mt-0.5 text-xs">{detailItem.timestamp || '-'}</p>
+                    </div>
+                    <div>
+                       <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Status</span>
+                       <div className="mt-1">
+                          <StatusBadge type={getStatusBadgeType(detailItem.status)} label={getStatusLabelInIndonesian(detailItem.status)} />
+                       </div>
+                    </div>
+                 </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-border/50 bg-muted/20 flex justify-end">
+                 <Button 
+                   variant="default"
+                   onClick={() => setDetailItem(null)}
+                   className="px-5 font-bold h-10 rounded-xl"
+                 >
+                    Tutup
+                 </Button>
+              </div>
+           </motion.div>
+        </div>
       )}
     </div>
   );

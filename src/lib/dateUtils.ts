@@ -21,14 +21,11 @@
 
 const FALLBACK = 'Tidak tersedia';
 
-/** Locale used for all formatting. */
-const LOCALE = 'id-ID';
-
 /**
  * Attempts to convert any supported input into a JS Date.
  * Returns null if conversion fails or produces an invalid date.
  */
-function toDate(value: unknown): Date | null {
+export function toDate(value: unknown): Date | null {
   try {
     if (value == null || value === '') return null;
 
@@ -40,6 +37,15 @@ function toDate(value: unknown): Date | null {
     ) {
       const d = (value as { toDate: () => Date }).toDate();
       return isNaN(d.getTime()) ? null : d;
+    }
+
+    if (typeof value === 'object' && value !== null) {
+      const timestampLike = value as { seconds?: unknown; _seconds?: unknown };
+      const seconds = timestampLike.seconds ?? timestampLike._seconds;
+      if (typeof seconds === 'number') {
+        const d = new Date(seconds * 1000);
+        return isNaN(d.getTime()) ? null : d;
+      }
     }
 
     // Already a JS Date
@@ -59,6 +65,14 @@ function toDate(value: unknown): Date | null {
   }
 }
 
+function pad2(value: number): string {
+  return value.toString().padStart(2, '0');
+}
+
+export function getDateTimeMillis(value: unknown): number {
+  return toDate(value)?.getTime() ?? 0;
+}
+
 /**
  * Formats a timestamp as a full Indonesian date + time.
  * Output: "20/06/2026, 19:23"
@@ -66,14 +80,7 @@ function toDate(value: unknown): Date | null {
 export function formatDateTime(value: unknown): string {
   const d = toDate(value);
   if (!d) return FALLBACK;
-  return new Intl.DateTimeFormat(LOCALE, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(d);
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 /**
@@ -83,11 +90,7 @@ export function formatDateTime(value: unknown): string {
 export function formatDate(value: unknown): string {
   const d = toDate(value);
   if (!d) return FALLBACK;
-  return new Intl.DateTimeFormat(LOCALE, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(d);
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
 /**
@@ -97,9 +100,5 @@ export function formatDate(value: unknown): string {
 export function formatTime(value: unknown): string {
   const d = toDate(value);
   if (!d) return FALLBACK;
-  return new Intl.DateTimeFormat(LOCALE, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(d);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }

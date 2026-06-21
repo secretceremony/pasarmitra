@@ -20,7 +20,7 @@ import {
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
-import { formatDate } from '../../../lib/dateUtils';
+import { formatDateTime, getDateTimeMillis, toDate } from '../../../lib/dateUtils';
 import { 
   AreaChart, 
   Area, 
@@ -190,8 +190,8 @@ export const AdminDashboard = () => {
     orders.forEach(o => {
       if (o.status === 'delivered' && o.created_at) {
         try {
-          const d = new Date(o.created_at);
-          if (isNaN(d.getTime())) return;
+          const d = toDate(o.created_at);
+          if (!d) return;
           const mName = months[d.getMonth()];
           if (volumeMap[mName] !== undefined) {
             volumeMap[mName] += Number(o.total_amount) || 0;
@@ -212,9 +212,9 @@ export const AdminDashboard = () => {
 
   const getRecentAuditLogs = () => {
     const sorted = [...auditLogs].sort((a, b) => {
-      const aTime = a.created_at || a.timestamp || '';
-      const bTime = b.created_at || b.timestamp || '';
-      return bTime.localeCompare(aTime);
+      const aTime = getDateTimeMillis(a.created_at || a.timestamp);
+      const bTime = getDateTimeMillis(b.created_at || b.timestamp);
+      return bTime - aTime;
     });
     return sorted.slice(0, 5);
   };
@@ -278,22 +278,7 @@ export const AdminDashboard = () => {
 
   const actionQueue = getActionQueueItems();
 
-  const getRelativeTimeText = (timestampStr: string, createdAtStr?: string) => {
-    if (!createdAtStr && !timestampStr) return 'Baru saja';
-    try {
-      const date = new Date(createdAtStr || timestampStr);
-      const diffMs = new Date().getTime() - date.getTime();
-      const diffMin = Math.floor(diffMs / 60000);
-      const diffHr = Math.floor(diffMin / 60);
-
-      if (diffMin < 1) return 'Baru saja';
-      if (diffMin < 60) return `${diffMin} menit lalu`;
-      if (diffHr < 24) return `${diffHr} jam lalu`;
-      return formatDate(date);
-    } catch {
-      return timestampStr || 'Baru saja';
-    }
-  };
+  const getLogTimestampText = (timestampStr: unknown, createdAtStr?: unknown) => formatDateTime(createdAtStr || timestampStr);
 
   const getReadableEventTitle = (event: string) => {
     const ev = (event || '').toUpperCase();
@@ -380,22 +365,22 @@ export const AdminDashboard = () => {
 
   return (
     <div className="space-y-12">
-      <div className="flex items-center justify-between flex-wrap gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
          <div className="space-y-1 border-l-4 border-[#FFB162] pl-8 py-2">
-            <h1 className="text-4xl font-black tracking-tighter">Dashboard Admin PasarMitra</h1>
-            <p className="text-muted-foreground font-medium">Pantau operasional marketplace B2B, verifikasi distributor, transaksi, dispute, dan pendapatan platform.</p>
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tighter">Dashboard Admin PasarMitra</h1>
+            <p className="text-muted-foreground font-medium text-xs sm:text-sm">Pantau operasional marketplace B2B, verifikasi distributor, transaksi, dispute, dan pendapatan platform.</p>
          </div>
-         <div className="flex gap-4">
+         <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
             <Button 
               variant="outline" 
-              className="h-14 px-8 rounded-2xl border-border bg-card font-black flex gap-2 items-center cursor-pointer"
+              className="h-14 px-8 rounded-2xl border-border bg-card font-black flex gap-2 items-center cursor-pointer w-full sm:w-auto justify-center"
               onClick={() => navigate('/admin/verifications')}
             >
                <ShieldCheck size={20} className="text-[#FFB162]" />
                Tinjau Distributor
             </Button>
             <Button 
-              className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black shadow-xl shadow-primary/20 flex gap-2 items-center cursor-pointer"
+              className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black shadow-xl shadow-primary/20 flex gap-2 items-center cursor-pointer w-full sm:w-auto justify-center"
               onClick={() => navigate('/admin/disputes')}
             >
                <Scale size={20} />
@@ -461,22 +446,6 @@ export const AdminDashboard = () => {
                  icon: Scale, 
                  color: 'text-red-500',
                  badge: activeDisputesCount > 0 ? { text: 'PERLU TINDAKAN', style: 'bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse' } : null
-               },
-               { 
-                 label: 'Komisi Bulan Ini', 
-                 value: formatTurnover(commissionRevenue), 
-                 subtext: 'Pendapatan dari transaksi berhasil', 
-                 icon: TrendingUp, 
-                 color: 'text-emerald-500',
-                 badge: null
-               },
-               { 
-                 label: 'Langganan Bulan Ini', 
-                 value: formatTurnover(subscriptionRevenue), 
-                 subtext: 'Pendapatan dari paket distributor', 
-                 icon: Wallet, 
-                 color: 'text-blue-500',
-                 badge: null
                }
              ].map((stat, i) => (
                <motion.div
@@ -507,7 +476,7 @@ export const AdminDashboard = () => {
 
           <div className="grid lg:grid-cols-3 gap-8">
              {/* Main Chart */}
-             <div className="lg:col-span-2 bg-card border border-border/50 rounded-[3rem] p-10 shadow-xl space-y-8">
+             <div className="lg:col-span-2 bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-xl space-y-8">
                 <div className="flex justify-between items-center">
                    <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
                       <BarChart3 className="text-primary" />
@@ -525,14 +494,6 @@ export const AdminDashboard = () => {
                          <p className="text-lg font-black text-foreground">Belum ada transaksi bulan ini</p>
                          <p className="text-xs text-muted-foreground max-w-sm">Data transaksi akan muncul setelah UMKM melakukan pembelian dari distributor.</p>
                       </div>
-                      <Button 
-                         variant="outline" 
-                         size="sm" 
-                         className="h-10 px-6 rounded-xl border-border bg-card font-black text-xs uppercase tracking-widest cursor-pointer mt-2"
-                         onClick={() => navigate('/admin/finances')}
-                      >
-                         Lihat Keuangan
-                      </Button>
                    </div>
                 ) : (
                    <div className="h-[400px] w-full">
@@ -565,7 +526,7 @@ export const AdminDashboard = () => {
              </div>
 
              {/* Side Panel: Ringkasan Operasional */}
-             <div className="bg-card border border-border/50 rounded-[3rem] p-10 shadow-xl space-y-8 flex flex-col justify-between">
+             <div className="bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-xl space-y-8 flex flex-col justify-between">
                 <div>
                   <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
                      <Globe className="text-primary" />
@@ -573,7 +534,6 @@ export const AdminDashboard = () => {
                   </h3>
                   <div className="space-y-6 pt-6">
                      {[
-                       { label: 'Komisi Platform', value: `${parseFloat(globalBaseline.toFixed(2))}%`, link: '/admin/commissions', color: 'text-[#FFB162]' },
                        { label: 'Dispute Aktif', value: `${activeDisputesCount} Kasus`, link: '/admin/disputes', color: 'text-rose-500' },
                        { label: 'Refund Pending', value: `${pendingRefundsCount} Klaim`, link: '/admin/disputes', color: 'text-red-500' }
                      ].map((stat) => (
@@ -602,7 +562,7 @@ export const AdminDashboard = () => {
           </div>
 
           {/* Antrian Tindakan Admin Section */}
-          <div className="bg-card border border-border/50 rounded-[3rem] p-10 shadow-xl space-y-6">
+          <div className="bg-card border border-border/50 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-xl space-y-6">
              <div className="flex justify-between items-center flex-wrap gap-4">
                 <div className="space-y-1">
                    <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
@@ -630,7 +590,7 @@ export const AdminDashboard = () => {
                 </div>
              ) : (
                 <div className="overflow-x-auto border border-border/30 rounded-2xl">
-                   <table className="w-full text-left border-collapse font-sans">
+                   <table className="w-full text-left border-collapse font-sans min-w-[700px]">
                       <thead>
                          <tr className="bg-muted/30 border-b border-border/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                             <th className="p-4 pl-6">Prioritas</th>
@@ -670,33 +630,6 @@ export const AdminDashboard = () => {
              )}
           </div>
 
-          {/* Platform Revenue Summary Section */}
-          <div className="bg-card border border-border/50 rounded-[3rem] p-10 shadow-xl space-y-6">
-             <div className="space-y-1">
-                <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                   <Wallet className="text-primary" />
-                   Pendapatan Platform
-                </h3>
-                <p className="text-muted-foreground font-medium text-xs">
-                   Rangkuman model bisnis platform PasarMitra yang bersumber dari komisi transaksi B2B distributor-UMKM dan biaya langganan distributor aktif.
-                </p>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
-                {[
-                  { label: 'Komisi Transaksi', value: formatTurnover(commissionRevenue), desc: 'Berdasarkan volume transaksi distributor' },
-                  { label: 'Langganan Distributor', value: formatTurnover(subscriptionRevenue), desc: 'Paket langganan bulanan aktif' },
-                  { label: 'Total Pendapatan Platform', value: formatTurnover(platformRevenue), desc: 'Akumulasi komisi + langganan' },
-                  { label: 'Estimasi Pendapatan Bulan Ini', value: formatTurnover(platformRevenue), desc: 'Estimasi pendapatan berjalan' }
-                ].map((item) => (
-                  <div key={item.label} className="p-6 bg-muted/20 border border-border/30 rounded-2xl space-y-1 hover:border-primary/20 transition-all">
-                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{item.label}</p>
-                     <p className="text-2xl font-black text-foreground">{item.value}</p>
-                     <p className="text-[10px] font-medium text-muted-foreground/60">{item.desc}</p>
-                  </div>
-                ))}
-             </div>
-          </div>
-
           {/* Recent Operational Activity Feed */}
           <div className="bg-[#1B2632] rounded-[4rem] p-12 text-[#EEE9DF] relative overflow-hidden shadow-3xl">
              <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary/10 to-transparent" />
@@ -720,7 +653,12 @@ export const AdminDashboard = () => {
 
                 <div className="space-y-4">
                    {recentLogs.length === 0 ? (
-                      <p className="text-white/40 font-bold text-sm italic py-6">Belum ada aktivitas terbaru.</p>
+                      <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/30">
+                          <Activity size={18} strokeWidth={1.5} />
+                        </div>
+                        <p className="text-white/40 font-bold text-sm">Belum ada aktivitas terbaru.</p>
+                      </div>
                    ) : (
                       recentLogs.map((log) => (
                         <div key={log.id} className="p-6 bg-white/5 border border-white/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -737,7 +675,7 @@ export const AdminDashboard = () => {
                                  )}
                                  <span>&bull;</span>
                                  <Clock size={12} className="inline animate-none text-white/40" /> 
-                                 <span>{getRelativeTimeText(log.timestamp, log.created_at)}</span>
+                                 <span>{getLogTimestampText(log.timestamp, log.created_at)}</span>
                               </p>
                            </div>
                            <div className="shrink-0 text-right">

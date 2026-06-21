@@ -387,7 +387,7 @@ export const LegalDocuments = () => {
                          
                          <div className="space-y-2">
                             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-3 flex items-center gap-1.5"><MapPin size={13} /> Alamat Legal Perusahaan (Kantor/Gudang Utama)</label>
-                            <input required type="text" placeholder="mis. Jl. Industri Utama No. 88, Bandung, Jawa Barat" className="w-full h-14 bg-muted/20 border border-border rounded-xl px-5 font-bold focus:border-primary focus:outline-none" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} />
+                            <input required type="text" placeholder="mis. Jl. Soekarno-Hatta KM 5 No. 88, Balikpapan Selatan, Balikpapan" className="w-full h-14 bg-muted/20 border border-border rounded-xl px-5 font-bold focus:border-primary focus:outline-none" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} />
                          </div>
                       </div>
 

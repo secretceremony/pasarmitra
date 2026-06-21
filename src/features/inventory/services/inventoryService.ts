@@ -8,7 +8,8 @@ import {
   updateDoc, 
   doc, 
   getDoc, 
-  deleteDoc 
+  deleteDoc,
+  documentId
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
@@ -60,9 +61,47 @@ export const inventoryService = {
     querySnapshot.forEach((doc) => {
       products.push({ id: doc.id, ...doc.data() } as Product);
     });
+
+    // Collect unique distributor IDs to cross-check their verification status
+    const distributorIds = [...new Set(products.map(p => p.distributor_id).filter(Boolean))];
+
+    if (distributorIds.length === 0) {
+      return products.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    }
+
+    // Firestore 'in' queries support max 30 items per batch
+    const verifiedDistributorIds = new Set<string>();
+    const batchSize = 30;
+    for (let i = 0; i < distributorIds.length; i += batchSize) {
+      const batch = distributorIds.slice(i, i + batchSize);
+      const profilesSnap = await getDocs(
+        query(collection(db, 'profiles'), where(documentId(), 'in', batch))
+      );
+      profilesSnap.forEach((profileDoc) => {
+        const data = profileDoc.data();
+        // Only include products from distributors that are verified, active, and not suspended
+        if (
+          data.is_verified === true &&
+          data.is_active !== false &&
+          data.is_suspended !== true
+        ) {
+          verifiedDistributorIds.add(profileDoc.id);
+        }
+      });
+    }
+
+    // Filter out products from invalid distributors
+    const validProducts = products.filter(p => verifiedDistributorIds.has(p.distributor_id));
+
     // Sort in memory to avoid requiring complex composite indexes in Firestore
-    products.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-    return products;
+    return validProducts.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  },
+
+  getProductById: async (id: string): Promise<Product | null> => {
+    const docRef = doc(db, 'products', id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+    return { id: docSnap.id, ...docSnap.data() } as Product;
   },
 
   createProduct: async (product: Omit<Product, 'id' | 'created_at'>) => {

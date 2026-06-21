@@ -55,6 +55,34 @@ export interface Order {
 }
 
 export const orderService = {
+  getOrderById: async (id: string) => {
+    const docRef = doc(db, 'orders', id);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      return null;
+    }
+    const orderData = snap.data() as Omit<Order, 'id'>;
+    
+    // Resolve buyer_profile relation
+    let buyer_profile: Order['buyer_profile'] = undefined;
+    if (orderData.buyer_id) {
+      const profileSnap = await getDoc(doc(db, 'profiles', orderData.buyer_id));
+      if (profileSnap.exists()) {
+        const profileData = profileSnap.data();
+        buyer_profile = {
+          organization_name: profileData.organization_name || '',
+          email: profileData.email || '',
+        };
+      }
+    }
+    
+    return {
+      id: snap.id,
+      ...orderData,
+      buyer_profile
+    } as Order;
+  },
+
   getDistributorOrders: async (distributorId: string) => {
     const q = query(
       collection(db, 'orders'),
@@ -165,6 +193,20 @@ export const orderService = {
   },
 
   createOrder: async (orderData: Omit<Order, 'id' | 'created_at'>) => {
+    // Service-level verification guard
+    const buyerDocRef = doc(db, 'profiles', orderData.buyer_id);
+    const buyerSnap = await getDoc(buyerDocRef);
+    if (!buyerSnap.exists()) {
+      throw new Error('Profil pembeli tidak ditemukan.');
+    }
+    const buyerData = buyerSnap.data();
+    if (buyerData.is_suspended) {
+      throw new Error('Akun Anda sedang ditangguhkan. Pembelian tidak dapat dilanjutkan.');
+    }
+    if (buyerData.role === 'UMKM' && !buyerData.is_verified) {
+      throw new Error('Akun UMKM belum terverifikasi. Silakan ajukan verifikasi terlebih dahulu.');
+    }
+
     const timestamp = new Date().toISOString();
     const orderRef = doc(collection(db, 'orders'));
     const newOrder = {
@@ -180,6 +222,23 @@ export const orderService = {
   },
 
   createOrdersBatch: async (orders: { order_code: string; data: Omit<Order, 'id' | 'created_at'> }[]) => {
+    if (orders.length > 0) {
+      // Service-level verification guard
+      const firstOrder = orders[0].data;
+      const buyerDocRef = doc(db, 'profiles', firstOrder.buyer_id);
+      const buyerSnap = await getDoc(buyerDocRef);
+      if (!buyerSnap.exists()) {
+        throw new Error('Profil pembeli tidak ditemukan.');
+      }
+      const buyerData = buyerSnap.data();
+      if (buyerData.is_suspended) {
+        throw new Error('Akun Anda sedang ditangguhkan. Pembelian tidak dapat dilanjutkan.');
+      }
+      if (buyerData.role === 'UMKM' && !buyerData.is_verified) {
+        throw new Error('Akun UMKM belum terverifikasi. Silakan ajukan verifikasi terlebih dahulu.');
+      }
+    }
+
     const batch = writeBatch(db);
     const createdOrders: Order[] = [];
     const timestamp = new Date().toISOString();

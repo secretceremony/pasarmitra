@@ -26,7 +26,7 @@ import { db } from '../../../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { negotiationService } from '../../partners/services/negotiationService';
 
-const STEPS = ['Shipping', 'Payment', 'Review', 'Success'];
+const STEPS = ['Pengiriman', 'Pembayaran', 'Tinjauan', 'Berhasil'];
 
 const generateOrderCode = () => {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -78,7 +78,7 @@ export const CheckoutWizard = () => {
         }
         
         // 3. Status checks
-        if (negData.status === 'converted_to_order') {
+        if (negData.status === 'converted_to_order' || negData.status === 'checked_out') {
           setNegotiation(negData);
           return;
         }
@@ -135,7 +135,7 @@ export const CheckoutWizard = () => {
   }, [negotiationId, user]);
 
   const items: CartItem[] = negotiationId
-    ? (negotiation && negotiation.status !== 'converted_to_order'
+    ? (negotiation && negotiation.status !== 'converted_to_order' && negotiation.status !== 'checked_out'
         ? [
             {
               id: negotiation.product_id,
@@ -177,7 +177,7 @@ export const CheckoutWizard = () => {
     setIsSubmitting(true);
 
     const activeAddress = selectedAddress === 0 
-      ? 'Jl. Menteng Raya No. 42, Jakarta Pusat, DKI Jakarta 10310' 
+      ? (user?.address || user?.business_address || 'Jl. Jenderal Sudirman No. 88, Balikpapan Kota, Balikpapan 76112') 
       : 'Alamat Kustom/Tambahan';
       
     const activePaymentMethod = selectedPayment === 0 
@@ -316,6 +316,30 @@ export const CheckoutWizard = () => {
     }
   };
 
+  if (user && user.role === 'UMKM' && !user.is_verified) {
+    return (
+      <div className="max-w-xl mx-auto py-20 text-center space-y-8 bg-card border border-border/50 rounded-[4rem] shadow-3xl p-10">
+        <div className="w-24 h-24 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-500/20">
+          <X size={48} />
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-3xl font-black tracking-tight text-rose-500">Checkout Ditangguhkan</h2>
+          <p className="text-muted-foreground font-semibold">
+            Akun UMKM Anda belum terverifikasi. Silakan ajukan verifikasi terlebih dahulu sebelum melakukan pembelian.
+          </p>
+        </div>
+        <div className="flex gap-4 justify-center">
+          <Button onClick={() => navigate('/umkm/profile')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black cursor-pointer shadow-xl shadow-primary/20">
+            Ajukan Verifikasi
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/umkm/cart')} className="h-14 px-8 rounded-2xl border-border cursor-pointer">
+            Kembali ke Keranjang
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoadingNeg) {
     return (
       <div className="min-h-[400px] flex flex-col items-center justify-center gap-4 text-muted-foreground">
@@ -336,7 +360,7 @@ export const CheckoutWizard = () => {
           <p className="text-muted-foreground font-medium">{negError}</p>
         </div>
         <div className="flex gap-4 justify-center">
-          <Button onClick={() => navigate('/negotiations')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black cursor-pointer">
+          <Button onClick={() => navigate('/umkm/negosiasi-harga')} className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black cursor-pointer">
             Kembali ke Negosiasi
           </Button>
           <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-8 rounded-2xl border-border cursor-pointer">
@@ -347,7 +371,7 @@ export const CheckoutWizard = () => {
     );
   }
 
-  if (negotiationId && negotiation?.status === 'converted_to_order') {
+  if (negotiationId && (negotiation?.status === 'converted_to_order' || negotiation?.status === 'checked_out')) {
     return (
       <div className="max-w-xl mx-auto py-20 text-center space-y-8 bg-card border border-border/50 rounded-[4rem] shadow-3xl p-10">
         <div className="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto">
@@ -377,7 +401,7 @@ export const CheckoutWizard = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-20 px-4 md:px-0">
+    <div className="max-w-5xl mx-auto space-y-8 pb-20 px-4 md:px-0 w-full max-w-full overflow-hidden">
       {/* Explicit Back button in UI */}
       {step < 3 && (
         <Button
@@ -393,8 +417,8 @@ export const CheckoutWizard = () => {
       {/* Checkout Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between py-6 border-b border-border/50 gap-4">
          <div className="space-y-1">
-            <h1 className="text-4xl font-black tracking-tighter">Procurement Checkout</h1>
-            <p className="text-muted-foreground font-medium">Finalize your wholesale order and schedule delivery.</p>
+            <h1 className="text-4xl font-black tracking-tighter">Checkout Pembelian</h1>
+            <p className="text-muted-foreground font-medium">Selesaikan pesanan grosir Anda dan atur pengiriman.</p>
          </div>
          <div className="flex gap-4 flex-wrap">
             {STEPS.map((s, i) => (
@@ -428,42 +452,42 @@ export const CheckoutWizard = () => {
                   className="space-y-8"
                 >
                    <h2 className="text-2xl font-black tracking-tight">Shipping Destination</h2>
-                   <div className="grid gap-6">
+                   <div className="grid gap-4 sm:gap-6">
                       <div 
                         onClick={() => setSelectedAddress(0)}
                         className={cn(
-                          "p-8 border-2 rounded-[2.5rem] relative group cursor-pointer shadow-xl transition-all duration-300",
+                          "p-5 sm:p-8 border-2 rounded-2xl sm:rounded-[2.5rem] relative group cursor-pointer shadow-xl transition-all duration-300",
                           selectedAddress === 0 ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/20"
                         )}
                       >
                          {selectedAddress === 0 && (
-                           <div className="absolute top-6 right-6 text-primary">
-                              <CheckCircle2 size={24} />
+                           <div className="absolute top-4 right-4 sm:top-6 sm:right-6 text-primary">
+                              <CheckCircle2 size={20} className="sm:w-6 sm:h-6" />
                            </div>
                          )}
-                         <div className="flex items-center gap-4 mb-4">
-                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300", selectedAddress === 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-                               <MapPin size={24} />
+                         <div className="flex items-center gap-3 sm:gap-4 mb-4">
+                            <div className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all duration-300", selectedAddress === 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                               <MapPin size={20} className="sm:w-6 sm:h-6" />
                             </div>
-                            <h4 className="font-black text-lg">Main Warehouse (Default)</h4>
+                            <h4 className="font-black text-base sm:text-lg">Main Warehouse (Default)</h4>
                          </div>
-                         <p className="text-muted-foreground font-medium">
-                            Jl. Menteng Raya No. 42, Jakarta Pusat, DKI Jakarta 10310 <br />
-                            <span className="text-foreground font-bold italic">Attn: Budi Santoso (+62 812 9021 8821)</span>
+                         <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed">
+                            {user?.address || user?.business_address || 'Jl. Jenderal Sudirman No. 88, Balikpapan Kota, Balikpapan 76112'} <br className="hidden sm:block" />
+                            <span className="text-foreground font-bold italic mt-1 block">Attn: {user?.full_name || 'Mitra UMKM'} ({user?.phone || '+62 812 3456 7890'})</span>
                          </p>
                       </div>
 
-                      <div className="p-8 border border-border border-dashed rounded-[2.5rem] flex items-center justify-center group hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer opacity-60">
-                         <div className="flex flex-col items-center gap-4 py-4 text-muted-foreground group-hover:text-primary">
-                            <Plus size={32} />
-                            <span className="font-black text-sm uppercase tracking-widest">Add New Address</span>
+                      <div className="p-5 sm:p-8 border border-border border-dashed rounded-2xl sm:rounded-[2.5rem] flex items-center justify-center group hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer opacity-60">
+                         <div className="flex flex-col items-center gap-3 sm:gap-4 py-2 sm:py-4 text-muted-foreground group-hover:text-primary">
+                            <Plus size={24} className="sm:w-8 sm:h-8" />
+                            <span className="font-black text-xs sm:text-sm uppercase tracking-widest">Add New Address</span>
                          </div>
                       </div>
                    </div>
 
                    <div className="space-y-6 pt-6">
                       <h3 className="text-xl font-black tracking-tight">Logistics Provider</h3>
-                      <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                          {[
                            { name: 'PasarMitra Express', time: 'Today, 2-4 PM', price: 'FREE', icon: Truck },
                            { name: 'Same Day Freight', time: 'Within 4h', price: 'Rp 25.000', icon: Clock }
@@ -472,18 +496,18 @@ export const CheckoutWizard = () => {
                              key={i} 
                              onClick={() => setSelectedShipping(i)}
                              className={cn(
-                               "p-6 rounded-3xl border transition-all cursor-pointer flex items-center gap-4 duration-300",
+                               "p-4 sm:p-6 rounded-2xl sm:rounded-3xl border transition-all cursor-pointer flex items-center gap-3 sm:gap-4 duration-300",
                                selectedShipping === i ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-card hover:border-primary/20"
                              )}
                            >
-                              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300", selectedShipping === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
-                                 <ship.icon size={24} />
+                              <div className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0", selectedShipping === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                                 <ship.icon size={20} className="sm:w-6 sm:h-6" />
                               </div>
-                              <div className="flex-1">
-                                 <p className="font-black text-sm">{ship.name}</p>
-                                 <p className="text-xs font-medium text-muted-foreground">{ship.time}</p>
+                              <div className="flex-1 min-w-0">
+                                 <p className="font-black text-xs sm:text-sm truncate">{ship.name}</p>
+                                 <p className="text-[10px] sm:text-xs font-medium text-muted-foreground">{ship.time}</p>
                               </div>
-                              <span className="font-black text-sm text-primary">{ship.price}</span>
+                              <span className="font-black text-xs sm:text-sm text-primary shrink-0">{ship.price}</span>
                            </div>
                          ))}
                       </div>
@@ -500,30 +524,30 @@ export const CheckoutWizard = () => {
                    className="space-y-8"
                 >
                    <h2 className="text-2xl font-black tracking-tight">Payment Method</h2>
-                   <div className="grid gap-6">
+                   <div className="grid gap-4 sm:gap-6">
                       {[
-                        { name: 'Credit Term (30 Days)', fee: 'Verified Account Only', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
-                        { name: 'Bank Transfer (BCA/Mandiri)', fee: 'No fee', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
-                        { name: 'Balance / Wallet', fee: 'Instant', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' }
+                        { name: 'Termin Kredit (30 Hari)', fee: 'Hanya Akun Terverifikasi', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+                        { name: 'Transfer Bank (BCA/Mandiri)', fee: 'Tanpa biaya', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+                        { name: 'Saldo / Dompet', fee: 'Instan', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' }
                       ].map((pay, i) => (
                         <div 
                           key={i} 
                           onClick={() => setSelectedPayment(i)}
                           className={cn(
-                            "p-8 border-2 rounded-[2.5rem] flex items-center justify-between transition-all cursor-pointer duration-300",
+                            "p-4 sm:p-8 border-2 rounded-2xl sm:rounded-[2.5rem] flex items-center justify-between transition-all cursor-pointer duration-300 gap-4",
                             selectedPayment === i ? "border-primary bg-primary/5 shadow-xl" : "border-border bg-card hover:border-primary/20"
                           )}
                         >
-                           <div className="flex items-center gap-6">
-                              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center font-black transition-all duration-300", selectedPayment === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
-                                 <CreditCard size={28} />
+                           <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+                              <div className={cn("w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center font-black transition-all duration-300 shrink-0", selectedPayment === i ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                                 <CreditCard size={20} className="sm:w-7 sm:h-7" />
                               </div>
-                              <div>
-                                 <p className="font-black text-lg">{pay.name}</p>
-                                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{pay.fee}</p>
+                              <div className="min-w-0">
+                                 <p className="font-black text-sm sm:text-lg truncate">{pay.name}</p>
+                                 <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest truncate">{pay.fee}</p>
                               </div>
                            </div>
-                           {selectedPayment === i && <CheckCircle2 className="text-primary" size={24} />}
+                           {selectedPayment === i && <CheckCircle2 size={20} className="text-primary shrink-0 sm:w-6 sm:h-6" />}
                         </div>
                       ))}
                    </div>
@@ -538,43 +562,43 @@ export const CheckoutWizard = () => {
                    exit={{ opacity: 0, x: 20 }}
                    className="space-y-8"
                 >
-                   <h2 className="text-2xl font-black tracking-tight">Order Final Review</h2>
-                   <div className="p-8 bg-card border border-border/50 rounded-[3rem] shadow-xl space-y-8">
-                      <div className="flex items-center justify-between border-b border-border/50 pb-6">
-                         <div className="flex items-center gap-4 text-emerald-500">
-                            <ShieldCheck size={24} />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Procurement Guarantee Active</span>
-                         </div>
-                         <Button variant="ghost" onClick={() => setStep(0)} className="text-xs font-black text-primary cursor-pointer">EDIT SHIPPING</Button>
-                      </div>
-                      <div className="space-y-6">
-                         <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                               <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Delivery Address</p>
-                               <p className="font-bold">
-                                 {selectedAddress === 0 ? 'Jl. Menteng Raya No. 42 (Main Warehouse)' : 'Alamat Kustom'}
-                               </p>
-                            </div>
-                            <div className="text-right space-y-1">
-                               <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Payment Method</p>
-                               <p className="font-bold">
-                                 {selectedPayment === 0 ? 'Credit Term (30d)' : selectedPayment === 1 ? 'Bank Transfer' : 'Balance / Wallet'}
-                               </p>
-                            </div>
-                         </div>
-                         <div className="pt-6 border-t border-border/30">
-                            <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-4">Items Summary</p>
-                            <div className="space-y-3">
-                               {items.map((item) => (
-                                 <div key={item.id} className="flex justify-between text-sm">
-                                    <span className="font-medium">{item.name} <span className="text-primary font-black">x{item.quantity}</span></span>
-                                    <span className="font-black font-mono">Rp {(item.price * item.quantity).toLocaleString()}</span>
-                                 </div>
-                               ))}
-                            </div>
-                         </div>
-                      </div>
-                   </div>
+                   <h2 className="text-2xl font-black tracking-tight">Tinjauan Akhir Pesanan</h2>
+                    <div className="p-4 sm:p-8 bg-card border border-border/50 rounded-2xl sm:rounded-[3rem] shadow-xl space-y-6 sm:space-y-8">
+                       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-4 sm:pb-6 gap-3">
+                          <div className="flex items-center gap-2 sm:gap-4 text-emerald-500">
+                             <ShieldCheck size={20} className="sm:w-6 sm:h-6 shrink-0" />
+                             <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em]">Jaminan Pembelian Aktif</span>
+                          </div>
+                          <Button variant="ghost" onClick={() => setStep(0)} className="text-xs font-black text-primary cursor-pointer w-fit p-0 h-auto hover:bg-transparent">UBAH PENGIRIMAN</Button>
+                       </div>
+                       <div className="space-y-6">
+                          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                              <div className="space-y-1">
+                                 <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Alamat Pengiriman</p>
+                                 <p className="font-bold text-sm sm:text-base">
+                                   {selectedAddress === 0 ? (user?.address || user?.business_address || 'Jl. Jenderal Sudirman No. 88 (Gudang Utama)') : 'Alamat Kustom'}
+                                 </p>
+                              </div>
+                             <div className="text-left sm:text-right space-y-1">
+                                <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Metode Pembayaran</p>
+                                <p className="font-bold text-sm sm:text-base">
+                                  {selectedPayment === 0 ? 'Termin Kredit (30 Hari)' : selectedPayment === 1 ? 'Transfer Bank' : 'Saldo / Dompet'}
+                                </p>
+                             </div>
+                          </div>
+                          <div className="pt-6 border-t border-border/30">
+                             <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest mb-4">Ringkasan Item</p>
+                             <div className="space-y-3">
+                                {items.map((item) => (
+                                  <div key={item.id} className="flex justify-between text-xs sm:text-sm gap-4">
+                                     <span className="font-medium min-w-0 truncate">{item.name} <span className="text-primary font-black shrink-0">x{item.quantity}</span></span>
+                                     <span className="font-black font-mono shrink-0">Rp {(item.price * item.quantity).toLocaleString()}</span>
+                                  </div>
+                                ))}
+                             </div>
+                          </div>
+                       </div>
+                    </div>
                 </motion.div>
               )}
 
@@ -593,15 +617,15 @@ export const CheckoutWizard = () => {
                        <div className="space-y-3 px-12">
                           <h2 className="text-5xl font-black tracking-tighter">Pesanan Berhasil Dibuat!</h2>
                           <p className="text-muted-foreground font-medium text-lg leading-relaxed max-w-md mx-auto">
-                             Your procurement request <span className="text-foreground font-black">#{createdOrderCodes.join(', ')}</span> has been logged. Distributors are processing fulfillment.
+                             Permintaan pembelian Anda <span className="text-foreground font-black">#{createdOrderCodes.join(', ')}</span> telah dicatat. Distributor sedang memproses pemenuhan pesanan.
                           </p>
                        </div>
                       <div className="flex gap-4 justify-center">
                          <Button onClick={() => navigate('/orders')} className="h-14 px-10 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/30 cursor-pointer">
-                            Track Order
+                            Lacak Pesanan
                          </Button>
                          <Button variant="outline" onClick={() => navigate('/dashboard')} className="h-14 px-10 rounded-2xl border-border bg-background/50 backdrop-blur-xl font-black text-lg cursor-pointer">
-                            Go Home
+                            Ke Beranda
                          </Button>
                       </div>
                    </div>
@@ -612,64 +636,73 @@ export const CheckoutWizard = () => {
 
         {/* Sidebar Order Summary */}
         <div className="space-y-8">
-           <div className="p-8 md:p-10 bg-card border border-border/50 rounded-[2.5rem] md:rounded-[3rem] shadow-2xl space-y-8 md:space-y-10 lg:sticky lg:top-10 max-h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
-              <h3 className="text-2xl font-black tracking-tight">Order Summary</h3>
-              <div className="space-y-6">
+           <div className="p-5 sm:p-8 md:p-10 bg-card border border-border/50 rounded-2xl sm:rounded-[2.5rem] md:rounded-[3rem] shadow-2xl space-y-6 sm:space-y-8 md:space-y-10 lg:sticky lg:top-10 max-h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight">Ringkasan Pesanan</h3>
+              <div className="space-y-4 sm:space-y-6">
                  {items.length > 0 ? items.map((item) => (
-                    <div key={item.id} className="flex gap-4 group">
-                       <div className="w-14 h-14 rounded-xl bg-muted overflow-hidden shrink-0">
-                          <img src={item.image_url || `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=100`} className="w-full h-full object-cover" />
+                    <div key={item.id} className="flex gap-3 sm:gap-4 group items-center">
+                       <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-muted overflow-hidden shrink-0 border border-border">
+                          <img src={item.image_url || '/assets/fallback-product.png'} className="w-full h-full object-cover" alt={item.name} />
                        </div>
                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-black truncate leading-tight group-hover:text-primary transition-colors">{item.name}</p>
-                          <p className="text-xs text-muted-foreground font-medium">{item.quantity} {item.unit_type}</p>
+                          <p className="text-xs sm:text-sm font-black truncate leading-tight group-hover:text-primary transition-colors">{item.name}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">{item.quantity} {item.unit_type}</p>
                        </div>
-                       <p className="text-sm font-black italic">Rp {(item.price * item.quantity).toLocaleString()}</p>
+                       <p className="text-xs sm:text-sm font-black italic shrink-0">Rp {(item.price * item.quantity).toLocaleString()}</p>
                     </div>
                  )) : (
-                    <p className="text-muted-foreground italic font-medium">Cart is empty...</p>
+                    <p className="text-muted-foreground italic text-sm font-medium">Keranjang kosong...</p>
                  )}
               </div>
 
-              <div className="pt-8 border-t border-border/50 space-y-4">
-                 <div className="flex justify-between text-sm font-bold text-muted-foreground">
+              <div className="pt-6 sm:pt-8 border-t border-border/50 space-y-3 sm:space-y-4">
+                 <div className="flex justify-between text-xs sm:text-sm font-bold text-muted-foreground">
                     <span>Subtotal</span>
                     <span className="font-black text-foreground">Rp {totalPrice().toLocaleString()}</span>
                  </div>
-                 <div className="flex justify-between text-sm font-bold text-muted-foreground">
-                    <span>Shipping Fee</span>
+                 <div className="flex justify-between text-xs sm:text-sm font-bold text-muted-foreground">
+                    <span>Biaya Pengiriman</span>
                     <span className="text-primary font-black uppercase">
-                      {selectedShipping === 1 ? 'Rp 25.000' : 'FREE'}
+                      {selectedShipping === 1 ? 'Rp 25.000' : 'GRATIS'}
                     </span>
                  </div>
                  <div className="pt-4 flex justify-between items-end border-t border-border/30">
                     <div className="space-y-1">
-                       <p className="text-xs font-black text-primary uppercase tracking-widest">Total Payment</p>
-                       <p className="text-3xl font-black tracking-tighter">
+                       <p className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-widest">Total Pembayaran</p>
+                       <p className="text-2xl sm:text-3xl font-black tracking-tighter">
                          Rp {(totalPrice() + getShippingCost()).toLocaleString()}
                        </p>
                     </div>
                  </div>
               </div>
 
-               {step < 3 && (
-                 <Button 
-                   onClick={handleNext}
-                   disabled={items.length === 0 || isSubmitting}
-                   className="w-full h-16 rounded-2xl bg-[#06110B] text-primary font-black text-xl shadow-2xl shadow-primary/20 border border-primary/20 hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer flex items-center justify-center"
-                 >
-                    {isSubmitting ? 'Memproses...' : step === 2 ? 'Place Order' : 'Continue'}
-                    <ChevronRight size={24} className="ml-2" />
-                 </Button>
-               )}
+                {step < 3 && (
+                  <Button 
+                    onClick={handleNext}
+                    disabled={items.length === 0 || isSubmitting}
+                    className="w-full h-12 sm:h-16 rounded-xl sm:rounded-2xl bg-[#06110B] text-primary font-black text-base sm:text-xl shadow-2xl shadow-primary/20 border border-primary/20 hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer flex items-center justify-center"
+                  >
+                     {isSubmitting ? (
+                       <>
+                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                         Memproses...
+                       </>
+                     ) : (
+                       <>
+                         {step === 2 ? 'Buat Pesanan' : 'Lanjutkan'}
+                         <ChevronRight size={20} className="sm:w-6 sm:h-6 ml-2" />
+                       </>
+                     )}
+                  </Button>
+                )}
            </div>
 
-           <div className="p-8 bg-primary/5 border border-primary/20 rounded-[2.5rem] flex items-center gap-6">
-              <ShieldCheck className="text-primary shrink-0" size={32} />
+           <div className="p-5 sm:p-8 bg-primary/5 border border-primary/20 rounded-2xl sm:rounded-[2.5rem] flex items-center gap-4 sm:gap-6">
+              <ShieldCheck className="text-primary shrink-0 w-8 h-8 sm:w-10 sm:h-10" />
               <div>
-                 <p className="text-xs font-black text-primary uppercase mb-1">PasarMitra Secure</p>
-                 <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                    Financial data is encrypted and funds are held in escrow until goods are delivered and verified.
+                 <p className="text-[10px] sm:text-xs font-black text-primary uppercase mb-1">PasarMitra Aman</p>
+                 <p className="text-[10px] sm:text-xs text-muted-foreground font-medium leading-relaxed">
+                    Data keuangan dienkripsi dan dana disimpan bersama (escrow) sampai barang dikirim dan diverifikasi.
                  </p>
               </div>
            </div>

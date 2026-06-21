@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '../../../components/ui/button';
+import { toast } from 'sonner';
 import { ReputationBadge } from '../../../components/common/ReputationBadge';
 import { cn } from '../../../lib/utils';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -58,7 +59,7 @@ export const DistributorProfile = () => {
           setDistributor({
             id: profileDoc.id,
             name: profileData.organization_name || profileData.full_name || 'Distributor Mitra',
-            location: 'Bandung, Jawa Barat',
+            location: profileData.address || 'Balikpapan, Kalimantan Timur',
             rating: profileData.reputation_score || 4.7,
             verified: profileData.is_verified || false,
             description: profileData.description || 'Penyedia logistik dan barang kebutuhan pokok grosir terpercaya mitra PasarMitra.',
@@ -109,18 +110,18 @@ export const DistributorProfile = () => {
   }
 
   return (
-    <div className="space-y-12 pb-20">
+    <div className="space-y-8 sm:space-y-12 pb-20 w-full max-w-full overflow-hidden px-4 sm:px-6 md:px-8">
       {/* Header / Cover */}
-      <div className="relative">
+      <div className="relative w-full">
          <Button 
            variant="outline" 
            onClick={() => navigate(-1)}
-           className="absolute top-8 left-8 z-10 h-12 w-12 rounded-2xl border-white/20 bg-black/40 backdrop-blur-xl text-white hover:bg-white hover:text-black transition-all"
+           className="absolute top-4 left-4 sm:top-8 sm:left-8 z-10 h-10 w-10 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl border-white/20 bg-black/40 backdrop-blur-xl text-white hover:bg-white hover:text-black transition-all p-0 flex items-center justify-center"
          >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} className="sm:w-6 sm:h-6" />
          </Button>
          
-         <div className="h-[300px] w-full rounded-[3.5rem] bg-gradient-to-br from-[#06110B] via-[#0B2516] to-[#122A1E] relative overflow-hidden">
+         <div className="h-[180px] sm:h-[300px] w-full rounded-[2rem] sm:rounded-[3.5rem] bg-gradient-to-br from-[#06110B] via-[#0B2516] to-[#122A1E] relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
             <motion.div 
               initial={{ scale: 0.8, opacity: 0 }}
@@ -129,49 +130,42 @@ export const DistributorProfile = () => {
             />
          </div>
 
-         <div className="px-12 -mt-24 relative z-10 flex flex-col md:flex-row items-end gap-10">
-            <div className="w-48 h-48 rounded-[3rem] bg-card border-8 border-background shadow-2xl flex items-center justify-center text-primary font-black text-6xl shadow-primary/10">
-               {distributor.name[0]?.toUpperCase()}
-            </div>
-            <div className="flex-1 pb-4 space-y-4">
-               <div className="flex items-center gap-4">
-                  <h1 className="text-4xl font-black tracking-tighter leading-none">{distributor.name}</h1>
-                  {distributor.verified && <ShieldCheck size={32} className="text-primary drop-shadow-[0_0_12px_rgba(34,197,94,0.4)]" />}
-               </div>
-               <div className="flex flex-wrap items-center gap-8 text-muted-foreground font-bold tracking-tight uppercase text-xs">
-                  <span className="flex items-center gap-2"><MapPin size={18} className="text-primary" /> {distributor.location}</span>
-                  <span className="flex items-center gap-2"><Clock size={18} className="text-primary" /> Mitra Sejak {distributor.joined}</span>
-                  <span className="flex items-center gap-2 font-black text-primary"><ShoppingBag size={18} /> {distributor.products_count} Produk</span>
-               </div>
-            </div>
-            <div className="flex gap-4 pb-4">
-               {user?.role === 'UMKM' && products.length > 0 && (
-                  <Button 
-                     className="h-14 px-8 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20"
-                     onClick={() => setSelectedNegotiateProduct({ ...products[0], distributor_name: distributor.name })}
-                  >
-                     <MessageSquareText size={20} className="mr-2" />
-                     Negosiasi Harga
-                  </Button>
-               )}
-                <div className="relative group/tooltip w-fit">
-                   <Button 
-                      disabled 
-                      aria-disabled="true"
-                      variant="outline" 
-                      className="h-14 px-8 rounded-2xl border-border bg-card/40 text-muted-foreground/60 font-black text-lg cursor-not-allowed opacity-50"
-                   >
-                      Ajukan Kemitraan
-                   </Button>
-                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] py-1.5 px-3 rounded-lg whitespace-nowrap z-50 shadow-lg border border-border/50 font-bold">
-                      Fitur kemitraan eksklusif segera hadir
-                   </div>
+          <div className="px-4 sm:px-12 -mt-16 sm:-mt-24 relative z-10 flex flex-col lg:flex-row items-center lg:items-end gap-6 lg:gap-10 text-center lg:text-left">
+             <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-[2rem] sm:rounded-[3rem] bg-card border-4 sm:border-8 border-background shadow-2xl flex items-center justify-center text-primary font-black text-4xl sm:text-6xl shadow-primary/10 shrink-0">
+                {distributor.name[0]?.toUpperCase()}
+             </div>
+             <div className="flex-1 pb-2 lg:pb-4 space-y-3 sm:space-y-4 w-full">
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-2 sm:gap-4">
+                   <h1 className="text-2xl sm:text-4xl font-black tracking-tighter leading-none">{distributor.name}</h1>
+                   {distributor.verified && <ShieldCheck size={24} className="text-primary drop-shadow-[0_0_12px_rgba(34,197,94,0.4)] sm:w-8 sm:h-8" />}
                 </div>
-            </div>
-         </div>
+                <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center lg:justify-start gap-2 sm:gap-8 text-muted-foreground font-bold tracking-tight uppercase text-[10px] sm:text-xs">
+                   <span className="flex items-center gap-1.5"><MapPin size={15} className="text-primary" /> {distributor.location}</span>
+                   <span className="flex items-center gap-1.5"><Clock size={15} className="text-primary" /> Mitra Sejak {distributor.joined}</span>
+                   <span className="flex items-center gap-1.5 font-black text-primary"><ShoppingBag size={15} /> {distributor.products_count} Produk</span>
+                </div>
+             </div>
+             <div className="flex flex-col sm:flex-row flex-wrap gap-3 pb-2 lg:pb-4 w-full lg:w-auto min-w-0 justify-center lg:justify-end">
+                {user?.role === 'UMKM' && products.length > 0 && (
+                   <Button 
+                      className="h-11 sm:h-12 px-6 rounded-xl bg-primary text-primary-foreground font-black text-sm sm:text-base shadow-xl shadow-primary/20 w-full sm:w-auto justify-center whitespace-normal"
+                      onClick={() => {
+                        if (user?.is_verified !== true) {
+                          toast.error("Akun UMKM Anda belum terverifikasi. Silakan ajukan verifikasi terlebih dahulu.");
+                          return;
+                        }
+                        setSelectedNegotiateProduct({ ...products[0], distributor_name: distributor.name });
+                      }}
+                   >
+                      <MessageSquareText size={18} className="mr-2 shrink-0" />
+                      Negosiasi Harga
+                   </Button>
+                )}
+             </div>
+          </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-12">
+      <div className="grid lg:grid-cols-3 gap-6 lg:gap-12">
         {/* Sidebar Info */}
         <div className="space-y-10">
             <div className="bg-card border border-border/50 rounded-[3rem] p-10 space-y-8 shadow-xl">
@@ -252,30 +246,41 @@ export const DistributorProfile = () => {
                     {products.map((prod) => (
                        <motion.div 
                          key={prod.id}
-                         whileHover={{ y: -8 }}
-                         className="bg-card border border-border/50 rounded-3xl overflow-hidden group shadow-xl flex flex-col h-full"
+                         whileHover={user?.role === 'UMKM' ? { y: -8, scale: 1.01 } : { y: -8 }}
+                         onClick={() => {
+                           if (user?.role === 'UMKM') {
+                             navigate(`/umkm/products/${prod.id}`);
+                           }
+                         }}
+                         className={cn(
+                           "bg-card border border-border/50 rounded-3xl overflow-hidden group shadow-xl flex flex-col h-full transition-shadow duration-300",
+                           user?.role === 'UMKM' && "cursor-pointer hover:shadow-2xl"
+                         )}
                        >
                           <div className="relative aspect-square overflow-hidden bg-muted">
-                             <img src={prod.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={prod.name} />
+                             <img src={prod.image_url || '/assets/fallback-product.png'} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={prod.name} />
                              <div className="absolute top-4 left-4">
                                 <span className="px-3 py-1 bg-black/40 backdrop-blur-md text-white rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">Tersedia</span>
                              </div>
                              {user?.role === 'UMKM' && (
                                 <button 
-                                  onClick={() => handleAddToCart({
-                                    id: prod.id,
-                                    name: prod.name,
-                                    price: prod.price,
-                                    category: prod.category || 'Grains',
-                                    image: prod.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400',
-                                    rating: 4.7,
-                                    bulk: `${prod.min_order_quantity} ${prod.unit_type}`,
-                                    unit: prod.unit_type,
-                                    distributor: distributor.name,
-                                    distributorId: distributor.id,
-                                    stock: prod.stock
-                                  })}
-                                  className="absolute bottom-4 right-4 w-12 h-12 bg-white/10 backdrop-blur-2xl rounded-xl flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all shadow-2xl cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToCart({
+                                      id: prod.id,
+                                      name: prod.name,
+                                      price: prod.price,
+                                      category: prod.category || 'Grains',
+                                      image: prod.image_url || '/assets/fallback-product.png',
+                                      rating: 4.7,
+                                      bulk: `${prod.min_order_quantity} ${prod.unit_type}`,
+                                      unit: prod.unit_type,
+                                      distributor: distributor.name,
+                                      distributorId: distributor.id,
+                                      stock: prod.stock
+                                    });
+                                  }}
+                                  className="absolute bottom-4 right-4 w-12 h-12 bg-white/10 backdrop-blur-2xl rounded-xl flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all shadow-2xl cursor-pointer z-10"
                                   title="Tambah ke Keranjang"
                                 >
                                    <ShoppingBag size={20} />
@@ -300,7 +305,14 @@ export const DistributorProfile = () => {
                                    <Button 
                                       variant="outline" 
                                       className="w-full h-10 rounded-xl border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground font-black text-[10px] uppercase tracking-wider"
-                                      onClick={() => setSelectedNegotiateProduct({ ...prod, distributor_name: distributor.name })}
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         if (user?.is_verified !== true) {
+                                           toast.error("Akun UMKM Anda belum terverifikasi. Silakan ajukan verifikasi terlebih dahulu.");
+                                           return;
+                                         }
+                                         setSelectedNegotiateProduct({ ...prod, distributor_name: distributor.name });
+                                       }}
                                    >
                                       Negosiasi Harga
                                    </Button>

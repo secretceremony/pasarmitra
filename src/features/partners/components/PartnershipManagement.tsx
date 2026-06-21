@@ -94,15 +94,21 @@ export const PartnershipManagement = () => {
                   Memuat permintaan...
                 </div>
               ) : requests.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground bg-card border border-border/50 rounded-[3rem] font-bold">
-                  Tidak ada permintaan kemitraan tertunda.
+                <div className="flex flex-col items-center justify-center gap-4 py-12 text-center bg-card border border-dashed border-border/60 rounded-[3rem]">
+                  <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground/50">
+                    <Handshake size={26} strokeWidth={1.5} />
+                  </div>
+                  <div className="space-y-1 max-w-xs">
+                    <p className="text-sm font-black text-foreground">Tidak ada permintaan kemitraan tertunda.</p>
+                    <p className="text-xs font-medium text-muted-foreground">Permintaan baru dari UMKM akan muncul di sini setelah mereka mengunjungi profil distributor Anda.</p>
+                  </div>
                 </div>
               ) : (
                 requests.map((req) => {
                   const umkm = req.umkm_profile;
                   const name = umkm?.organization_name || 'Mitra UMKM';
                   const initials = name.slice(0, 2).toUpperCase();
-                  const location = umkm?.organization_name ? 'Bandung, Jawa Barat' : 'Lokasi tidak diketahui';
+                  const location = (umkm as any)?.address || 'Balikpapan, Kalimantan Timur';
                   
                   return (
                     <motion.div 
@@ -165,7 +171,15 @@ export const PartnershipManagement = () => {
                  {isLoading ? (
                    <p className="text-sm text-center text-muted-foreground font-bold">Memuat mitra...</p>
                  ) : activePartners.length === 0 ? (
-                   <p className="text-sm text-center text-muted-foreground font-bold">Belum ada mitra aktif.</p>
+                   <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                     <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground/50">
+                       <Users size={22} strokeWidth={1.5} />
+                     </div>
+                     <div className="space-y-1">
+                       <p className="text-sm font-black text-foreground">Belum ada mitra aktif.</p>
+                       <p className="text-xs font-medium text-muted-foreground">Terima permintaan kemitraan dari daftar di atas untuk memulai.</p>
+                     </div>
+                   </div>
                  ) : (
                    activePartners.map((partner) => {
                      const umkm = partner.umkm_profile;

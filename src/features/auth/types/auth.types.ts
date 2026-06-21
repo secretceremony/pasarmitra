@@ -33,6 +33,11 @@ export interface UserProfile {
     phone: string;
     submitted_at: string;
   };
+  verification_notes?: string;
+  business_document_url?: string;
+  business_type?: string;
+  business_address?: string;
+  business_district?: string;
   updated_at?: string;
   created_at: string;
 }

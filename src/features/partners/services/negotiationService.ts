@@ -9,7 +9,8 @@ import {
   addDoc,
   setDoc,
   serverTimestamp,
-  orderBy
+  orderBy,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { createAuditLog } from '../../admin/services/adminService';
@@ -19,12 +20,21 @@ export interface Message {
   id: string;
   sender_id: string;
   sender_role: string;
+  sender_name?: string;
   type: 'text' | 'offer' | 'counter_offer' | 'system';
-  message: string;
+  message?: string;
+  text?: string;
   offer_price?: number;
   quantity?: number;
-  created_at: string;
-  read_by: string[];
+  offer?: {
+    unit_price: number;
+    quantity: number;
+    note?: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'expired';
+    offer_by: 'UMKM' | 'DISTRIBUTOR';
+  };
+  created_at: any;
+  read_by?: string[];
 }
 
 export interface Negotiation {
@@ -34,6 +44,8 @@ export interface Negotiation {
   distributor_name: string;
   umkm_id: string;
   umkm_name: string;
+  buyer_id?: string;
+  buyer_name?: string;
   product_id: string;
   product_name: string;
   product_image: string;
@@ -41,9 +53,13 @@ export interface Negotiation {
   requested_unit_price: number;
   agreed_unit_price?: number;
   quantity: number;
-  status: 'pending' | 'countered' | 'accepted' | 'rejected' | 'cancelled' | 'converted_to_order';
+  status: 'open' | 'waiting_distributor' | 'waiting_buyer' | 'accepted' | 'rejected' | 'cancelled' | 'expired' | 'checked_out' | 'converted_to_order';
   latest_message: string;
   latest_message_at: string;
+  last_message?: string;
+  last_message_at?: any;
+  last_offer_price?: number;
+  last_offer_by?: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -64,8 +80,7 @@ export const negotiationService = {
     const field = role === 'UMKM' ? 'umkm_id' : 'distributor_id';
     const q = query(
       collection(db, 'negotiations'),
-      where(field, '==', userId),
-      orderBy('latest_message_at', 'desc')
+      where(field, '==', userId)
     );
 
     const snap = await getDocs(q);
@@ -73,6 +88,14 @@ export const negotiationService = {
     snap.forEach((d) => {
       result.push({ id: d.id, ...d.data() } as Negotiation);
     });
+
+    // Sort in memory by latest_message_at or created_at descending to avoid composite index requirements
+    result.sort((a, b) => {
+      const timeA = new Date(a.latest_message_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.latest_message_at || b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+
     return result;
   },
 
@@ -139,47 +162,155 @@ export const negotiationService = {
       throw new Error('Anda tidak dapat melakukan negosiasi dengan bisnis Anda sendiri.');
     }
 
-    // Fetch distributor name if needed
     const distributorId = product.distributor_id;
     const distributorName = product.distributor_name || 'Distributor';
 
-    // Generate code
-    const randomCode = `NEG-${Math.floor(10000 + Math.random() * 90000)}`;
+    // 2. Check for an existing active negotiation room for same buyer + distributor + product
+    const existingQ = query(
+      collection(db, 'negotiations'),
+      where('umkm_id', '==', umkmId),
+      where('product_id', '==', productId)
+    );
+    const existingSnap = await getDocs(existingQ);
+    let activeNeg: any = null;
+    
+    existingSnap.forEach((d) => {
+      const data = d.data();
+      const status = data.status || 'open';
+      if (['open', 'waiting_distributor', 'waiting_buyer', 'accepted', 'pending', 'countered'].includes(status)) {
+        activeNeg = { id: d.id, ...data };
+      }
+    });
+
     const timestamp = new Date().toISOString();
 
-    // Create negotiation document
+    if (activeNeg) {
+      // Reuse existing open room
+      const negRef = doc(db, 'negotiations', activeNeg.id);
+      
+      const batch = writeBatch(db);
+
+      // Counter/expire any previous pending offers first
+      const messagesRef = collection(db, 'negotiations', activeNeg.id, 'messages');
+      const qMsg = query(messagesRef, where('type', '==', 'offer'));
+      const messagesSnap = await getDocs(qMsg);
+      messagesSnap.forEach((dMsg) => {
+        const dataMsg = dMsg.data();
+        if (dataMsg.offer && dataMsg.offer.status === 'pending') {
+          batch.update(doc(db, 'negotiations', activeNeg.id, 'messages', dMsg.id), {
+            'offer.status': 'countered'
+          });
+        }
+      });
+
+      // Update parent negotiation document
+      batch.update(negRef, {
+        status: 'waiting_distributor',
+        quantity,
+        requested_unit_price: requestedPrice,
+        last_offer_price: requestedPrice,
+        last_offer_by: 'UMKM',
+        last_message: note || `Mengajukan penawaran baru sebesar Rp ${requestedPrice.toLocaleString('id-ID')}`,
+        last_message_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
+
+      // Create new offer message in messages subcollection
+      const newMsgRef = doc(collection(db, 'negotiations', activeNeg.id, 'messages'));
+      batch.set(newMsgRef, {
+        type: 'offer',
+        sender_id: umkmId,
+        sender_role: 'UMKM',
+        sender_name: umkmName,
+        text: note || '',
+        offer: {
+          unit_price: requestedPrice,
+          quantity,
+          note: note || '',
+          status: 'pending',
+          offer_by: 'UMKM'
+        },
+        created_at: serverTimestamp()
+      });
+
+      await batch.commit();
+
+      // Write audit log
+      await createAuditLog({
+        event: 'NEGOTIATION_COUNTERED',
+        status: 'SUCCESS',
+        user: umkmId,
+        details: `UMKM ${umkmName} mengirim penawaran baru dalam negosiasi yang ada ${activeNeg.negotiation_code} (Jumlah: ${quantity}, Harga: Rp ${requestedPrice})`,
+        targetCollection: 'negotiations',
+        targetId: activeNeg.id
+      });
+
+      return { id: activeNeg.id, ...activeNeg, status: 'waiting_distributor' } as Negotiation;
+    }
+
+    // 3. Create a brand new negotiation room
+    const randomCode = `NEG-${Math.floor(10000 + Math.random() * 90000)}`;
+
     const negData: Omit<Negotiation, 'id'> = {
       negotiation_code: randomCode,
       distributor_id: distributorId,
       distributor_name: distributorName,
       umkm_id: umkmId,
+      buyer_id: umkmId, // compat
       umkm_name: umkmName,
+      buyer_name: umkmName, // compat
       product_id: productId,
       product_name: product.name,
       product_image: product.image_url || '',
       original_unit_price: product.price || 0,
       requested_unit_price: requestedPrice,
       quantity,
-      status: 'pending',
+      status: 'waiting_distributor',
       latest_message: note || 'Mengajukan negosiasi harga.',
-      latest_message_at: timestamp,
+      latest_message_at: timestamp, // resolved dynamically in client if TS read, kept string ISO compat
       created_by: umkmId,
       created_at: timestamp,
       updated_at: timestamp
     };
 
-    const negRef = await addDoc(collection(db, 'negotiations'), negData);
+    // Add extra field properties for the prompt's required schema
+    const savePayload = {
+      ...negData,
+      last_message: note || 'Mengajukan negosiasi harga.',
+      last_offer_price: requestedPrice,
+      last_offer_by: 'UMKM',
+      last_message_at: serverTimestamp(),
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
 
-    // Create initial message
+    const negRef = await addDoc(collection(db, 'negotiations'), savePayload);
+
+    // Create initial offer message
     await addDoc(collection(db, 'negotiations', negRef.id, 'messages'), {
+      type: 'offer',
       sender_id: umkmId,
       sender_role: 'UMKM',
-      type: 'offer',
-      message: note || 'Mengajukan negosiasi harga.',
-      offer_price: requestedPrice,
-      quantity,
-      created_at: timestamp,
-      read_by: [umkmId]
+      sender_name: umkmName,
+      text: note || '',
+      offer: {
+        unit_price: requestedPrice,
+        quantity,
+        note: note || '',
+        status: 'pending',
+        offer_by: 'UMKM'
+      },
+      created_at: serverTimestamp()
+    });
+
+    // Create notification document in Firestore for distributor
+    await addDoc(collection(db, 'notifications'), {
+      user_id: distributorId,
+      title: 'Negosiasi Baru',
+      message: `UMKM ${umkmName} memulai negosiasi baru untuk produk ${product.name}.`,
+      type: 'info',
+      is_read: false,
+      created_at: serverTimestamp()
     });
 
     // Write audit log
@@ -202,6 +333,7 @@ export const negotiationService = {
     negotiationId: string,
     senderId: string,
     senderRole: 'UMKM' | 'DISTRIBUTOR',
+    senderName: string,
     counterPrice: number,
     quantity: number,
     message: string
@@ -230,7 +362,7 @@ export const negotiationService = {
     }
 
     // Transition checks
-    if (negData.status !== 'pending' && negData.status !== 'countered') {
+    if (['accepted', 'rejected', 'cancelled', 'checked_out'].includes(negData.status)) {
       throw new Error('Negosiasi sudah selesai atau dibatalkan.');
     }
 
@@ -248,35 +380,70 @@ export const negotiationService = {
       throw new Error(`Stok tidak mencukupi. Stok tersedia: ${product.stock || 0}.`);
     }
 
-    const timestamp = new Date().toISOString();
+    const batch = writeBatch(db);
 
-    // Update main document
-    await updateDoc(negRef, {
-      status: 'countered',
+    // 1. Counter/expire any previous pending offers
+    const messagesRef = collection(db, 'negotiations', negotiationId, 'messages');
+    const qMsg = query(messagesRef, where('type', '==', 'offer'));
+    const messagesSnap = await getDocs(qMsg);
+    messagesSnap.forEach((dMsg) => {
+      const dataMsg = dMsg.data();
+      if (dataMsg.offer && dataMsg.offer.status === 'pending') {
+        batch.update(doc(db, 'negotiations', negotiationId, 'messages', dMsg.id), {
+          'offer.status': 'countered'
+        });
+      }
+    });
+
+    // 2. Update parent negotiation status & details
+    const newStatus = senderRole === 'UMKM' ? 'waiting_distributor' : 'waiting_buyer';
+    batch.update(negRef, {
+      status: newStatus,
       requested_unit_price: counterPrice,
       quantity,
-      latest_message: message || `Menawarkan kembali dengan harga Rp ${counterPrice}`,
-      latest_message_at: timestamp,
-      updated_at: timestamp
+      last_offer_price: counterPrice,
+      last_offer_by: senderRole,
+      last_message: message || `${senderRole === 'UMKM' ? 'Pembeli' : 'Distributor'} mengirim penawaran balik.`,
+      last_message_at: serverTimestamp(),
+      updated_at: serverTimestamp()
     });
 
-    // Add counter message
-    await addDoc(collection(db, 'negotiations', negotiationId, 'messages'), {
+    // 3. Create counter-offer message in messages subcollection
+    const newMsgRef = doc(collection(db, 'negotiations', negotiationId, 'messages'));
+    batch.set(newMsgRef, {
+      type: 'offer',
       sender_id: senderId,
       sender_role: senderRole,
-      type: 'counter_offer',
-      message: message || `Menawarkan kembali dengan harga Rp ${counterPrice}`,
-      offer_price: counterPrice,
-      quantity,
-      created_at: timestamp,
-      read_by: [senderId]
+      sender_name: senderName,
+      text: message || '',
+      offer: {
+        unit_price: counterPrice,
+        quantity,
+        note: message || '',
+        status: 'pending',
+        offer_by: senderRole
+      },
+      created_at: serverTimestamp()
     });
+
+    const recipientId = senderRole === 'UMKM' ? negData.distributor_id : negData.umkm_id;
+    const notificationRef = doc(collection(db, 'notifications'));
+    batch.set(notificationRef, {
+      user_id: recipientId,
+      title: 'Penawaran Balik',
+      message: `${senderName} mengirim penawaran balik untuk ${negData.product_name}.`,
+      type: 'info',
+      is_read: false,
+      created_at: serverTimestamp()
+    });
+
+    await batch.commit();
 
     // Write audit log
     await createAuditLog({
       event: 'NEGOTIATION_COUNTERED',
       status: 'SUCCESS',
-      user: senderId,
+      user: senderName,
       details: `${senderRole} mengirim penawaran balik ${negData.negotiation_code} (Jumlah: ${quantity}, Harga: Rp ${counterPrice})`,
       targetCollection: 'negotiations',
       targetId: negotiationId
@@ -288,32 +455,42 @@ export const negotiationService = {
    */
   async acceptOffer(
     negotiationId: string,
+    messageId: string,
     userId: string,
     userRole: 'UMKM' | 'DISTRIBUTOR',
-    agreedPrice: number
+    userName: string
   ): Promise<void> {
     const negRef = doc(db, 'negotiations', negotiationId);
     const negSnap = await getDoc(negRef);
     if (!negSnap.exists()) {
       throw new Error('Data negosiasi tidak ditemukan.');
     }
-
     const negData = negSnap.data() as Negotiation;
 
-    // Enforce strict access control
-    if (userRole === 'UMKM' && negData.umkm_id !== userId) {
-      throw new Error('Akses ditolak.');
-    }
-    if (userRole === 'DISTRIBUTOR' && negData.distributor_id !== userId) {
-      throw new Error('Akses ditolak.');
-    }
-
     // Transition checks
-    if (negData.status !== 'pending' && negData.status !== 'countered') {
-      throw new Error('Hanya negosiasi berstatus pending atau countered yang dapat disetujui.');
+    if (['accepted', 'checked_out', 'cancelled'].includes(negData.status)) {
+      throw new Error('Negosiasi sudah disepakati, dibatalkan, atau selesai.');
     }
 
-    // Revalidate product status
+    const msgRef = doc(db, 'negotiations', negotiationId, 'messages', messageId);
+    const msgSnap = await getDoc(msgRef);
+    if (!msgSnap.exists()) {
+      throw new Error('Pesan penawaran tidak ditemukan.');
+    }
+    const msgData = msgSnap.data();
+    if (!msgData.offer || msgData.offer.status !== 'pending') {
+      throw new Error('Penawaran ini sudah tidak aktif atau sudah ditanggapi.');
+    }
+
+    // Safety: The sender of an offer cannot accept their own offer
+    if (msgData.offer.offer_by === userRole) {
+      throw new Error('Anda tidak dapat menyetujui penawaran Anda sendiri.');
+    }
+
+    const agreedPrice = msgData.offer.unit_price;
+    const agreedQuantity = msgData.offer.quantity;
+
+    // Revalidate product status & stock
     const productRef = doc(db, 'products', negData.product_id);
     const productSnap = await getDoc(productRef);
     if (!productSnap.exists()) {
@@ -323,37 +500,56 @@ export const negotiationService = {
     if (!product.is_active) {
       throw new Error('Produk sedang tidak aktif.');
     }
-    if (negData.quantity > (product.stock || 0)) {
+    if (agreedQuantity > (product.stock || 0)) {
       throw new Error(`Stok produk tidak mencukupi untuk disetujui. Tersedia: ${product.stock || 0}.`);
     }
 
-    const timestamp = new Date().toISOString();
+    const batch = writeBatch(db);
 
-    // Update main document
-    await updateDoc(negRef, {
+    // 1. Update the accepted offer status
+    batch.update(msgRef, {
+      'offer.status': 'accepted'
+    });
+
+    // 2. Update parent negotiation document
+    batch.update(negRef, {
       status: 'accepted',
       agreed_unit_price: agreedPrice,
-      accepted_at: timestamp,
-      latest_message: 'Penawaran harga disetujui.',
-      latest_message_at: timestamp,
-      updated_at: timestamp
+      quantity: agreedQuantity,
+      last_message: 'Penawaran disetujui. Harga akhir telah disepakati.',
+      last_message_at: serverTimestamp(),
+      updated_at: serverTimestamp()
     });
 
-    // Add system message
-    await addDoc(collection(db, 'negotiations', negotiationId, 'messages'), {
+    // 3. Add system message
+    const sysMsgRef = doc(collection(db, 'negotiations', negotiationId, 'messages'));
+    batch.set(sysMsgRef, {
+      type: 'system',
       sender_id: userId,
       sender_role: 'SYSTEM',
-      type: 'system',
-      message: `Penawaran harga Rp ${agreedPrice.toLocaleString('id-ID')} disetujui oleh ${userRole === 'UMKM' ? 'Pembeli' : 'Distributor'}.`,
-      created_at: timestamp,
-      read_by: [userId]
+      sender_name: 'SYSTEM',
+      text: `Tawaran disetujui oleh ${userRole === 'UMKM' ? 'Pembeli' : 'Distributor'}. Harga akhir disepakati: Rp ${agreedPrice.toLocaleString('id-ID')} (Qty: ${agreedQuantity}).`,
+      created_at: serverTimestamp()
     });
+
+    const recipientId = userRole === 'UMKM' ? negData.distributor_id : negData.umkm_id;
+    const notificationRef = doc(collection(db, 'notifications'));
+    batch.set(notificationRef, {
+      user_id: recipientId,
+      title: 'Negosiasi Disetujui',
+      message: `Penawaran untuk produk ${negData.product_name} disetujui oleh ${userRole === 'UMKM' ? 'Pembeli' : 'Distributor'}.`,
+      type: 'success',
+      is_read: false,
+      created_at: serverTimestamp()
+    });
+
+    await batch.commit();
 
     // Write audit log
     await createAuditLog({
       event: 'NEGOTIATION_ACCEPTED',
       status: 'SUCCESS',
-      user: userId,
+      user: userName,
       details: `Negosiasi ${negData.negotiation_code} disetujui dengan harga kesepakatan Rp ${agreedPrice} oleh ${userRole}`,
       targetCollection: 'negotiations',
       targetId: negotiationId
@@ -365,8 +561,10 @@ export const negotiationService = {
    */
   async rejectOffer(
     negotiationId: string,
+    messageId: string,
     userId: string,
     userRole: 'UMKM' | 'DISTRIBUTOR',
+    userName: string,
     reason: string
   ): Promise<void> {
     const negRef = doc(db, 'negotiations', negotiationId);
@@ -374,49 +572,67 @@ export const negotiationService = {
     if (!negSnap.exists()) {
       throw new Error('Data negosiasi tidak ditemukan.');
     }
-
     const negData = negSnap.data() as Negotiation;
 
-    // Enforce strict access control
-    if (userRole === 'UMKM' && negData.umkm_id !== userId) {
-      throw new Error('Akses ditolak.');
+    const msgRef = doc(db, 'negotiations', negotiationId, 'messages', messageId);
+    const msgSnap = await getDoc(msgRef);
+    if (!msgSnap.exists()) {
+      throw new Error('Pesan penawaran tidak ditemukan.');
     }
-    if (userRole === 'DISTRIBUTOR' && negData.distributor_id !== userId) {
-      throw new Error('Akses ditolak.');
-    }
-
-    // Transition checks
-    if (negData.status !== 'pending' && negData.status !== 'countered') {
-      throw new Error('Negosiasi sudah selesai atau tidak aktif.');
+    const msgData = msgSnap.data();
+    if (!msgData.offer || msgData.offer.status !== 'pending') {
+      throw new Error('Penawaran ini sudah tidak aktif atau sudah ditanggapi.');
     }
 
-    const timestamp = new Date().toISOString();
+    if (msgData.offer.offer_by === userRole) {
+      throw new Error('Anda tidak dapat menolak penawaran Anda sendiri.');
+    }
 
-    // Update main document
-    await updateDoc(negRef, {
-      status: 'rejected',
-      rejected_at: timestamp,
-      latest_message: `Negosiasi ditolak. Alasan: ${reason || 'Tidak ada alasan ditentukan.'}`,
-      latest_message_at: timestamp,
-      updated_at: timestamp
+    const batch = writeBatch(db);
+
+    // 1. Update the rejected offer status
+    batch.update(msgRef, {
+      'offer.status': 'rejected'
     });
 
-    // Add system message
-    await addDoc(collection(db, 'negotiations', negotiationId, 'messages'), {
+    // 2. Update main negotiation document
+    batch.update(negRef, {
+      status: 'rejected',
+      last_message: `Penawaran ditolak oleh ${userRole === 'UMKM' ? 'Pembeli' : 'Distributor'}.${reason ? ` Alasan: ${reason}` : ''}`,
+      last_message_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    });
+
+    // 3. Add system message
+    const sysMsgRef = doc(collection(db, 'negotiations', negotiationId, 'messages'));
+    batch.set(sysMsgRef, {
+      type: 'system',
       sender_id: userId,
       sender_role: 'SYSTEM',
-      type: 'system',
-      message: `Negosiasi ditolak oleh ${userRole === 'UMKM' ? 'Pembeli' : 'Distributor'}. Alasan: ${reason || '-'}`,
-      created_at: timestamp,
-      read_by: [userId]
+      sender_name: 'SYSTEM',
+      text: `Tawaran ditolak oleh ${userRole === 'UMKM' ? 'Pembeli' : 'Distributor'}.${reason ? ` Alasan: ${reason}` : ''}`,
+      created_at: serverTimestamp()
     });
+
+    const recipientId = userRole === 'UMKM' ? negData.distributor_id : negData.umkm_id;
+    const notificationRef = doc(collection(db, 'notifications'));
+    batch.set(notificationRef, {
+      user_id: recipientId,
+      title: 'Negosiasi Ditolak',
+      message: `Penawaran untuk produk ${negData.product_name} ditolak oleh ${userRole === 'UMKM' ? 'Pembeli' : 'Distributor'}.${reason ? ` Alasan: ${reason}` : ''}`,
+      type: 'error',
+      is_read: false,
+      created_at: serverTimestamp()
+    });
+
+    await batch.commit();
 
     // Write audit log
     await createAuditLog({
       event: 'NEGOTIATION_REJECTED',
       status: 'BLOCK',
-      user: userId,
-      details: `Negosiasi ${negData.negotiation_code} ditolak oleh ${userRole}. Alasan: ${reason || '-'}`,
+      user: userName,
+      details: `Penawaran negosiasi ${negData.negotiation_code} ditolak oleh ${userRole}. Alasan: ${reason || '-'}`,
       targetCollection: 'negotiations',
       targetId: negotiationId
     });
@@ -431,45 +647,46 @@ export const negotiationService = {
     if (!negSnap.exists()) {
       throw new Error('Data negosiasi tidak ditemukan.');
     }
-
     const negData = negSnap.data() as Negotiation;
 
-    // Enforce strict access control (only UMKM can cancel)
     if (negData.umkm_id !== userId) {
       throw new Error('Akses ditolak. Hanya pembeli yang dapat membatalkan negosiasi.');
     }
 
     // Transition checks
-    if (negData.status !== 'pending' && negData.status !== 'countered') {
+    if (['accepted', 'checked_out', 'cancelled'].includes(negData.status)) {
       throw new Error('Negosiasi sudah berada di status final.');
     }
 
-    const timestamp = new Date().toISOString();
+    const batch = writeBatch(db);
 
     // Update main document
-    await updateDoc(negRef, {
+    batch.update(negRef, {
       status: 'cancelled',
-      cancelled_at: timestamp,
-      latest_message: 'Negosiasi dibatalkan oleh pembeli.',
-      latest_message_at: timestamp,
-      updated_at: timestamp
+      last_message: 'Negosiasi dibatalkan oleh pembeli.',
+      last_message_at: serverTimestamp(),
+      updated_at: serverTimestamp()
     });
 
     // Add system message
-    await addDoc(collection(db, 'negotiations', negotiationId, 'messages'), {
+    const sysMsgRef = doc(collection(db, 'negotiations', negotiationId, 'messages'));
+    batch.set(sysMsgRef, {
+      type: 'system',
       sender_id: userId,
       sender_role: 'SYSTEM',
-      type: 'system',
-      message: 'Negosiasi dibatalkan oleh pembeli.',
-      created_at: timestamp,
-      read_by: [userId]
+      sender_name: 'SYSTEM',
+      text: 'Negosiasi dibatalkan oleh pembeli.',
+      created_at: serverTimestamp()
     });
 
+    await batch.commit();
+
     // Write audit log
+    const userEmail = negData.umkm_name || userId;
     await createAuditLog({
       event: 'NEGOTIATION_CANCELLED',
       status: 'WARNING',
-      user: userId,
+      user: userEmail,
       details: `Negosiasi ${negData.negotiation_code} dibatalkan oleh pembeli`,
       targetCollection: 'negotiations',
       targetId: negotiationId
@@ -491,17 +708,20 @@ export const negotiationService = {
     await addDoc(collection(db, 'negotiations', negotiationId, 'messages'), {
       sender_id: senderId,
       sender_role: senderRole,
+      sender_name: senderRole === 'SYSTEM' ? 'SYSTEM' : (senderRole === 'UMKM' ? 'Pembeli' : 'Distributor'),
       type: 'text',
-      message: text,
-      created_at: timestamp,
-      read_by: [senderId]
+      text: text, // structured schema property
+      message: text, // legacy compat
+      created_at: serverTimestamp()
     });
 
     // Update latest message
     await updateDoc(doc(db, 'negotiations', negotiationId), {
-      latest_message: text,
-      latest_message_at: timestamp,
-      updated_at: timestamp
+      last_message: text,
+      latest_message: text, // legacy compat
+      last_message_at: serverTimestamp(),
+      latest_message_at: timestamp, // legacy compat
+      updated_at: serverTimestamp()
     });
   },
 
@@ -555,7 +775,7 @@ export const negotiationService = {
     }
 
     // 2. Prevent duplicate checkout
-    if (negData.status === 'converted_to_order' || negData.converted_order_id) {
+    if (negData.status === 'checked_out' || negData.status === 'converted_to_order' || negData.converted_order_id) {
       throw new Error('Negosiasi ini sudah diproses menjadi pesanan sebelumnya.');
     }
 
@@ -639,26 +859,31 @@ export const negotiationService = {
       updated_at: timestamp
     };
 
+    const batch = writeBatch(db);
+
     // 8. Create the order
     const orderRef = doc(collection(db, 'orders'));
-    await setDoc(orderRef, orderData);
+    batch.set(orderRef, orderData);
 
-    // 9. Update negotiation status to converted_to_order ONLY after order creation succeeds
-    await updateDoc(negRef, {
-      status: 'converted_to_order',
+    // 9. Update negotiation status to checked_out and converted_to_order compat
+    batch.update(negRef, {
+      status: 'checked_out',
       converted_order_id: orderRef.id,
-      updated_at: timestamp
+      updated_at: serverTimestamp()
     });
 
     // 10. Add system message in the negotiation room
-    await addDoc(collection(db, 'negotiations', negotiationId, 'messages'), {
+    const sysMsgRef = doc(collection(db, 'negotiations', negotiationId, 'messages'));
+    batch.set(sysMsgRef, {
+      type: 'system',
       sender_id: buyerId,
       sender_role: 'SYSTEM',
-      type: 'system',
-      message: `Negosiasi dikonversi menjadi pesanan (Order Code: ${orderCode}, Order ID: ${orderRef.id}).`,
-      created_at: timestamp,
-      read_by: [buyerId]
+      sender_name: 'SYSTEM',
+      text: `Negosiasi dikonversi menjadi pesanan (Order Code: ${orderCode}, Order ID: ${orderRef.id}).`,
+      created_at: serverTimestamp()
     });
+
+    await batch.commit();
 
     // 11. Write audit log
     await createAuditLog({

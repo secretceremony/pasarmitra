@@ -58,21 +58,17 @@ describe('AdminDashboard', () => {
     expect(screen.getByText(/Tinjau Distributor/i)).toBeInTheDocument();
     expect(screen.getByText(/Arbitrase Sengketa/i)).toBeInTheDocument();
 
-    // Check safe fallback values (Rp 0) for platform commission/subscriptions
-    expect(screen.getAllByText(/Rp 0/i).length).toBeGreaterThan(0);
-
-    // Verify new KPI cards are present
-    expect(screen.getByText(/Komisi Bulan Ini/i)).toBeInTheDocument();
-    expect(screen.getByText(/Langganan Bulan Ini/i)).toBeInTheDocument();
-    expect(screen.getByText(/Pendapatan dari paket distributor/i)).toBeInTheDocument();
+    // Verify current KPI cards are present
+    expect(screen.getByText(/Total Pengguna/i)).toBeInTheDocument();
+    expect(screen.getByText(/Distributor Aktif/i)).toBeInTheDocument();
+    expect(screen.getByText(/UMKM Aktif/i)).toBeInTheDocument();
+    expect(screen.getByText(/Verifikasi Pending/i)).toBeInTheDocument();
+    expect(screen.getByText(/Produk Pending/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Dispute Aktif/i).length).toBeGreaterThan(0);
 
     // Verify chart empty state is rendered correctly
     expect(screen.getByText(/Belum ada transaksi bulan ini/i)).toBeInTheDocument();
     expect(screen.getByText(/Data transaksi akan muncul setelah UMKM melakukan pembelian dari distributor\./i)).toBeInTheDocument();
-    expect(screen.getByText(/Lihat Keuangan/i)).toBeInTheDocument();
-
-    // Verify Platform Revenue summary section is present
-    expect(screen.getByRole('heading', { name: /^Pendapatan Platform$/i })).toBeInTheDocument();
 
     // Verify Action Queue is present and shows the empty state correctly
     expect(screen.getByText(/Antrian Tindakan Admin/i)).toBeInTheDocument();

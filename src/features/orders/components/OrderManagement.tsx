@@ -103,7 +103,7 @@ export const OrderManagement = () => {
 
   useEffect(() => {
     if (user?.role === 'ADMIN') {
-      navigate('/admin/finances');
+      navigate('/admin/dashboard');
     }
   }, [navigate, user?.role]);
 
@@ -168,14 +168,24 @@ export const OrderManagement = () => {
     return matchesTab && matchesSearch;
   });
 
+  const handleOrderClick = (orderId: string) => {
+    if (user?.role === 'UMKM') {
+      navigate(`/umkm/orders/${orderId}`);
+    } else if (user?.role === 'DISTRIBUTOR') {
+      navigate(`/distributor/orders/${orderId}`);
+    } else if (user?.role === 'ADMIN') {
+      navigate(`/admin/orders/${orderId}`);
+    }
+  };
+
   return (
-    <div className="space-y-10 pb-20">
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-black tracking-tighter">
+    <div className="space-y-4 sm:space-y-6 pb-12 w-full max-w-full overflow-hidden px-4 sm:px-0">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between w-full">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">
             {isBuyer ? 'Pesanan Saya' : 'Pesanan Masuk'}
           </h1>
-          <p className="max-w-2xl text-lg font-medium text-muted-foreground">
+          <p className="max-w-xl text-sm sm:text-base font-medium text-muted-foreground leading-relaxed">
             {isBuyer
               ? 'Lacak status pengiriman dan riwayat pembelian sembako Anda.'
               : 'Proses pemenuhan dan lacak pengiriman di seluruh jaringan mitra Anda.'}
@@ -183,25 +193,25 @@ export const OrderManagement = () => {
         </div>
 
         {isDistributor && (
-          <div className="flex flex-wrap gap-4">
-            <Button variant="outline" className="h-14 rounded-2xl border-border bg-card/40 px-8 font-black">
+          <div className="flex flex-wrap gap-2.5 w-full sm:w-auto">
+            <Button variant="outline" className="h-10 sm:h-11 rounded-xl border-border bg-card/40 px-5 sm:px-6 font-black text-xs flex-1 sm:flex-none justify-center">
               Proses Massal
             </Button>
-            <Button className="h-14 rounded-2xl bg-primary px-8 font-black text-primary-foreground shadow-xl shadow-primary/20">
-              <Printer className="mr-2" size={20} />
+            <Button className="h-10 sm:h-11 rounded-xl bg-primary px-5 sm:px-6 font-black text-xs text-primary-foreground shadow-xl shadow-primary/20 flex-1 sm:flex-none justify-center">
+              <Printer className="mr-2" size={14} />
               Cetak Faktur
             </Button>
           </div>
         )}
       </div>
 
-      <div className="flex w-full gap-2 overflow-x-auto rounded-3xl border border-border/50 bg-card p-2 md:w-fit">
+      <div className="flex w-full gap-1 sm:gap-1.5 overflow-x-auto rounded-xl border border-border/50 bg-card p-1 sm:p-1.5 md:w-fit custom-scrollbar shrink-0">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'whitespace-nowrap rounded-2xl px-6 py-3 text-sm font-black transition-all',
+              'whitespace-nowrap rounded-lg sm:rounded-xl px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-black transition-all',
               activeTab === tab.key
                 ? 'bg-primary text-primary-foreground shadow-lg'
                 : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'
@@ -212,48 +222,62 @@ export const OrderManagement = () => {
         ))}
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center w-full">
         <div className="group relative flex-1">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" size={20} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary w-4 h-4" />
           <input
             type="text"
             placeholder={isBuyer ? 'Cari berdasarkan kode pesanan, distributor, atau item...' : 'Cari berdasarkan kode pesanan, pembeli, atau item...'}
-            className="h-14 w-full rounded-2xl border border-border/50 bg-card/60 px-16 text-sm font-bold transition-all focus:border-primary/40 focus:bg-card focus:outline-none"
+            className="h-10 sm:h-12 w-full rounded-xl border border-border/50 bg-card/60 pl-10 pr-5 text-xs sm:text-sm font-bold transition-all focus:border-primary/40 focus:bg-card focus:outline-none"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
         </div>
-        <Button variant="outline" className="h-14 rounded-2xl border-border bg-card/40 px-8 font-bold">
-          <Filter size={20} />
+        <Button variant="outline" className="h-10 sm:h-12 rounded-xl border-border bg-card/40 px-5 sm:px-6 font-bold text-xs justify-center w-full sm:w-auto">
+          <Filter size={14} className="mr-2" />
           Filter
         </Button>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-4 sm:gap-6 w-full">
         {isLoading ? (
-          <div className="rounded-[2.5rem] border border-border/50 bg-card p-12 text-center font-bold text-muted-foreground">
+          <div className="rounded-2xl sm:rounded-[2.5rem] border border-border/50 bg-card p-12 text-center font-bold text-muted-foreground">
             Memuat pesanan...
           </div>
         ) : error ? (
-          <div className="space-y-2 rounded-[2.5rem] border border-border/50 bg-card p-12 text-center">
-            <p className="text-xl font-black">Gagal memuat pesanan.</p>
-            <p className="text-sm font-bold text-muted-foreground">Silakan coba buka halaman ini kembali.</p>
+          <div className="space-y-2 rounded-2xl sm:rounded-[2.5rem] border border-border/50 bg-card p-12 text-center">
+            <p className="text-lg sm:text-xl font-black">Gagal memuat pesanan.</p>
+            <p className="text-xs sm:text-sm font-bold text-muted-foreground">Silakan coba buka halaman ini kembali.</p>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="space-y-4 rounded-[2.5rem] border border-border/50 bg-card p-16 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40 text-muted-foreground/40">
-              <ShoppingBag size={32} />
+          <div className="space-y-4 rounded-2xl sm:rounded-[2.5rem] border border-border/50 bg-card p-12 sm:p-16 text-center">
+            <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-xl sm:rounded-2xl bg-muted/40 text-muted-foreground/40">
+              <ShoppingBag size={28} className="sm:w-8 sm:h-8" />
             </div>
             <div className="space-y-1">
-              <p className="text-xl font-black">
-                {isBuyer ? 'Belum ada pesanan.' : 'Belum ada pesanan masuk.'}
+              <p className="text-lg sm:text-xl font-black">
+                {searchQuery
+                  ? 'Tidak ada pesanan yang cocok.'
+                  : isBuyer
+                    ? 'Belum ada pesanan.'
+                    : 'Belum ada pesanan masuk.'}
               </p>
-              <p className="text-sm font-bold text-muted-foreground">
-                {isBuyer
-                  ? 'Produk yang kamu checkout akan muncul di sini.'
-                  : 'Pesanan dari UMKM akan muncul setelah checkout berhasil.'}
+              <p className="text-xs sm:text-sm font-bold text-muted-foreground">
+                {searchQuery
+                  ? 'Coba kata kunci atau filter lain.'
+                  : isBuyer
+                    ? 'Produk yang kamu checkout akan muncul di sini.'
+                    : 'Pesanan dari UMKM akan muncul setelah checkout berhasil.'}
               </p>
             </div>
+            {isBuyer && !searchQuery && (
+              <Button
+                onClick={() => navigate('/marketplace')}
+                className="h-10 rounded-xl bg-primary text-primary-foreground font-black text-xs uppercase tracking-wider px-6 shadow-lg shadow-primary/20"
+              >
+                Mulai Belanja
+              </Button>
+            )}
           </div>
         ) : (
           filteredOrders.map((order, index) => {
@@ -266,12 +290,13 @@ export const OrderManagement = () => {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="flex flex-col gap-8 rounded-[2.5rem] border border-border/50 bg-card p-6 shadow-xl transition-all hover:border-primary/30 md:p-10 xl:flex-row xl:items-center"
+                onClick={() => handleOrderClick(order.id)}
+                className="flex flex-col gap-4 sm:gap-5 rounded-2xl border border-border/50 bg-card p-4 sm:p-5 md:p-6 shadow-xl transition-all hover:border-primary/30 xl:flex-row xl:items-center w-full max-w-full overflow-hidden cursor-pointer hover:bg-muted/5 active:scale-[0.99] hover:shadow-2xl"
               >
-                <div className="flex min-w-0 items-center gap-6 xl:w-1/4">
+                <div className="flex items-center gap-3 sm:gap-4 xl:w-1/4 min-w-0 w-full">
                   <div
                     className={cn(
-                      'flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.75rem] text-3xl font-black shadow-inner',
+                      'flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-xl text-lg sm:text-2xl font-black shadow-inner',
                       order.status === 'pending' ? 'bg-amber-500/10 text-amber-500' :
                         order.status === 'processing' ? 'bg-blue-500/10 text-blue-500' :
                           order.status === 'shipped' ? 'bg-emerald-500/10 text-emerald-500' :
@@ -280,53 +305,53 @@ export const OrderManagement = () => {
                   >
                     {(order.order_code || order.id || '').slice(-2).toUpperCase()}
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-2xl font-black tracking-tight">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm sm:text-lg font-black tracking-tight break-all">
                       Pesanan #{order.order_code || order.id.slice(0, 8).toUpperCase()}
                     </p>
-                    <p className="mt-1 text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                    <p className="mt-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground truncate">
                       {formatOrderDate(order.created_at)}
                     </p>
                   </div>
                 </div>
 
-                <div className="min-w-0 flex-1 space-y-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <p className="text-xl font-black transition-colors hover:text-primary">
+                <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-2 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 items-start w-full min-w-0">
+                    <p className="text-sm sm:text-lg font-black transition-colors hover:text-primary break-words line-clamp-2">
                       {isBuyer
                         ? (order.distributor_name || 'Distributor tidak diketahui')
                         : (order.buyer_name || order.buyer_profile?.organization_name || 'UMKM tidak diketahui')}
                     </p>
-                    <span className="rounded-full bg-muted/40 px-3 py-1 text-xs font-black uppercase tracking-tighter text-muted-foreground">
+                    <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-tighter text-muted-foreground shrink-0">
                       {order.items?.length || 0} Barang
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <ShoppingBag size={16} className="shrink-0 text-primary/60" />
-                    <p className="truncate text-sm font-bold">{getItemsSummary(order)}</p>
+                  <div className="flex items-center gap-2 text-muted-foreground min-w-0">
+                    <ShoppingBag size={13} className="shrink-0 text-primary/60" />
+                    <p className="truncate text-xs sm:text-sm font-bold">{getItemsSummary(order)}</p>
                   </div>
                   {isDistributor && (
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <MapPin size={16} className="shrink-0 text-primary/60" />
-                      <p className="truncate text-sm font-bold">{order.shipping_address || 'Alamat tidak ditentukan'}</p>
+                    <div className="flex items-center gap-2 text-muted-foreground min-w-0">
+                      <MapPin size={13} className="shrink-0 text-primary/60" />
+                      <p className="truncate text-xs sm:text-sm font-bold">{order.shipping_address || 'Alamat tidak ditentukan'}</p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between xl:w-1/3">
-                  <div className="sm:text-right">
-                    <p className="text-2xl font-black">
+                <div className="flex flex-col sm:flex-row xl:flex-col gap-3 sm:items-center sm:justify-between xl:items-end xl:justify-center xl:w-1/3 border-t border-border/30 pt-3 xl:border-t-0 xl:pt-0 w-full min-w-0">
+                  <div className="sm:text-right xl:text-right">
+                    <p className="text-lg sm:text-xl font-black">
                       Rp {(Number(order.total_amount) || 0).toLocaleString('id-ID')}
                     </p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                    <p className="mt-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-primary">
                       {getPaymentStatusLabel(order.payment_status)}
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 sm:justify-end">
+                  <div className="flex flex-wrap items-center gap-2.5 sm:justify-end xl:justify-end w-full sm:w-auto">
                     <span
                       className={cn(
-                        'rounded-full px-6 py-2 text-[10px] font-black uppercase tracking-wider shadow-sm',
+                        'rounded-full px-3 py-1 sm:px-4 sm:py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-sm',
                         order.status === 'pending' ? 'bg-amber-500/20 text-amber-500' :
                           order.status === 'processing' ? 'bg-blue-500/20 text-blue-500' :
                             order.status === 'shipped' ? 'bg-emerald-500/20 text-emerald-500' :
@@ -338,11 +363,14 @@ export const OrderManagement = () => {
 
                     {isDistributor && nextStatus && (
                       <Button
-                        onClick={() => handleStatusUpdate(order.id, order.status)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStatusUpdate(order.id, order.status);
+                        }}
                         disabled={isUpdating}
-                        className="h-12 min-w-28 rounded-xl bg-primary px-4 text-xs font-black uppercase text-primary-foreground"
+                        className="h-8 sm:h-9 min-w-20 sm:min-w-24 rounded-lg bg-primary px-2.5 sm:px-3 text-[9px] sm:text-[10px] font-black uppercase text-primary-foreground shadow-lg shadow-primary/10"
                       >
-                        {isUpdating && <Loader2 className="mr-2 animate-spin" size={16} />}
+                        {isUpdating && <Loader2 className="mr-1 animate-spin" size={12} />}
                         {isUpdating ? 'Memproses...' : getActionLabel(order.status)}
                       </Button>
                     )}

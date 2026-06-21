@@ -47,7 +47,7 @@ export function useDashboardData() {
           distributor: distributorName,
           distributorId: data.distributor_id || '',
           unit: data.unit_type || 'Unit',
-          image: data.image_url || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=400',
+          image: data.image_url || '/assets/fallback-product.png',
           discount: data.discount_tag || '',
           description: data.description || '',
           category: data.category || 'Sembako',
@@ -90,7 +90,7 @@ export function useDashboardData() {
         rawSuppliers.push({
           id: sId,
           name: data.organization_name || data.business_name || data.full_name || 'Distributor',
-          location: data.address || 'Indonesia',
+          location: data.address || 'Balikpapan, Kalimantan Timur',
           rating: data.reputation_score || 5.0,
           verified: data.is_verified || false,
           products: productCount,

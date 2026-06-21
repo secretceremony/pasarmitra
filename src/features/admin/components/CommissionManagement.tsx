@@ -218,9 +218,14 @@ export const CommissionManagement = () => {
 
               <div className="grid gap-6">
                  {filteredTiers.length === 0 ? (
-                    <div className="text-center py-20 bg-card border border-dashed border-border/50 rounded-[2.5rem] space-y-4">
-                       <p className="text-muted-foreground font-black text-lg">Belum ada data komisi.</p>
-                       <p className="text-xs text-muted-foreground/60 max-w-md mx-auto">Database `commission_tiers` di Firestore kosong. Harap tambahkan data tingkatan komisi melalui console Firestore.</p>
+                    <div className="text-center py-16 bg-card border border-dashed border-border/50 rounded-[2.5rem] space-y-4">
+                       <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground/50 mx-auto">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+                       </div>
+                       <div className="space-y-1.5">
+                         <p className="text-muted-foreground font-black text-base">Belum ada data komisi.</p>
+                         <p className="text-xs text-muted-foreground/60 max-w-md mx-auto">Database <code className="bg-muted px-1 py-0.5 rounded text-xs">commission_tiers</code> di Firestore kosong. Harap tambahkan data tingkatan komisi melalui console Firestore.</p>
+                       </div>
                     </div>
                  ) : (
                     filteredTiers.map((tier) => (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingDown, Loader2 } from 'lucide-react';
+import { X, TrendingDown, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../../../components/ui/button';
 import { negotiationService } from '../services/negotiationService';
@@ -82,7 +82,7 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
     try {
       setIsSubmitting(true);
       setError(null);
-      await negotiationService.createNegotiation(
+      const neg = await negotiationService.createNegotiation(
         umkmId,
         umkmName,
         productId,
@@ -92,7 +92,7 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
       );
       toast.success('Pengajuan negosiasi berhasil dikirim.');
       onClose();
-      navigate('/umkm/negosiasi-harga');
+      navigate(`/umkm/negosiasi-harga?id=${neg.id}`);
     } catch (err: any) {
       console.error('Error creating negotiation:', err);
       setError(err.message || 'Gagal memulai negosiasi harga.');
@@ -118,33 +118,33 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-2xl bg-card border border-border/50 rounded-[2.5rem] shadow-2xl p-8 sm:p-10 overflow-hidden"
+          className="relative w-full max-w-2xl bg-card border border-border/50 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl p-5 sm:p-10 max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-border/50 pb-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center font-black">
-                <TrendingDown size={24} />
+          <div className="flex items-center justify-between border-b border-border/50 pb-4 sm:pb-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 text-primary rounded-lg sm:rounded-xl flex items-center justify-center font-black shrink-0">
+                <TrendingDown size={20} className="sm:w-6 sm:h-6" />
               </div>
               <div>
-                <h3 className="text-2xl font-black tracking-tight">Ajukan Negosiasi Harga</h3>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight">Ajukan Negosiasi Harga</h3>
+                <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5 sm:mt-1">
                   B2B Direct Quotation Console
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-3 bg-muted/40 rounded-xl hover:bg-muted transition-all"
+              className="p-2 sm:p-3 bg-muted/40 rounded-lg sm:rounded-xl hover:bg-muted transition-all"
             >
-              <X size={20} />
+              <X size={18} className="sm:w-5 sm:h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6 mt-8">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 mt-6 sm:mt-8 w-full max-w-full">
             {/* Product Card Info */}
-            <div className="flex gap-6 p-6 bg-muted/20 border border-border/50 rounded-3xl">
-              <div className="w-20 h-20 rounded-xl bg-muted overflow-hidden shrink-0 border border-border">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-6 bg-muted/20 border border-border/50 rounded-2xl sm:rounded-3xl w-full max-w-full overflow-hidden">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-muted overflow-hidden shrink-0 border border-border">
                 {productImage ? (
                   <img src={productImage} alt={productName} className="w-full h-full object-cover" />
                 ) : (
@@ -154,13 +154,13 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-primary uppercase tracking-wider">{distributorName}</p>
-                <h4 className="text-lg font-black truncate text-foreground mt-0.5">{productName}</h4>
-                <div className="flex gap-4 mt-2 text-xs font-bold text-muted-foreground uppercase">
-                  <span>Harga Asli: Rp {originalPrice.toLocaleString('id-ID')}</span>
-                  <span>•</span>
+                <p className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-wider">{distributorName}</p>
+                <h4 className="text-base sm:text-lg font-black truncate text-foreground mt-0.5">{productName}</h4>
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-4 gap-y-1.5 sm:gap-4 mt-2 text-[10px] sm:text-xs font-bold text-muted-foreground uppercase">
+                  <span className="col-span-2 sm:col-span-1">Harga Asli: Rp {originalPrice.toLocaleString('id-ID')}</span>
+                  <span className="hidden sm:inline">•</span>
                   <span>Stok: {stock} {unit}</span>
-                  <span>•</span>
+                  <span className="hidden sm:inline">•</span>
                   <span>MOQ: {moq} {unit}</span>
                 </div>
               </div>
@@ -173,9 +173,9 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
             )}
 
             {/* Input fields */}
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
-                <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+                <label className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">
                   Jumlah Barang ({unit})
                 </label>
                 <input
@@ -186,12 +186,12 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
                   placeholder={`${moq}`}
-                  className="w-full h-16 bg-muted/30 border border-border rounded-2xl px-6 font-bold focus:border-primary focus:outline-none"
+                  className="w-full h-12 sm:h-16 bg-muted/30 border border-border rounded-xl sm:rounded-2xl px-4 sm:px-6 font-bold focus:border-primary focus:outline-none text-sm sm:text-base"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+                <label className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">
                   Harga Penawaran Unit (Rp)
                 </label>
                 <input
@@ -201,13 +201,13 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
                   value={requestedPrice}
                   onChange={(e) => setRequestedPrice(Number(e.target.value))}
                   placeholder={`Maks Rp ${(originalPrice - 1).toLocaleString('id-ID')}`}
-                  className="w-full h-16 bg-muted/30 border border-border rounded-2xl px-6 font-bold focus:border-primary focus:outline-none"
+                  className="w-full h-12 sm:h-16 bg-muted/30 border border-border rounded-xl sm:rounded-2xl px-4 sm:px-6 font-bold focus:border-primary focus:outline-none text-sm sm:text-base"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+              <label className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">
                 Catatan Awal (Opsional)
               </label>
               <textarea
@@ -215,27 +215,36 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Berikan alasan penawaran Anda (misal: untuk kemitraan jangka panjang, pemesanan volume berkala, dll)"
                 rows={3}
-                className="w-full bg-muted/30 border border-border rounded-2xl p-6 font-bold focus:border-primary focus:outline-none resize-none text-sm"
+                className="w-full bg-muted/30 border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 font-bold focus:border-primary focus:outline-none resize-none text-xs sm:text-sm"
               />
             </div>
 
-            {/* Calculations preview */}
-            <div className="p-6 bg-gradient-to-br from-[#06110B] to-[#122A1E] border border-primary/20 rounded-3xl text-white">
-              <div className="flex justify-between items-center text-xs font-black text-primary uppercase tracking-widest mb-4">
-                <span>Estimasi Total</span>
-                <span>Margin Penurunan</span>
+            {requestedPrice > 0 && requestedPrice < originalPrice * 0.7 && (
+              <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl text-xs font-bold border border-amber-500/20 flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0 animate-pulse text-amber-500" />
+                <span>Peringatan: Harga penawaran di bawah 70% dari harga asli. Penawaran yang terlalu rendah berisiko tinggi ditolak oleh distributor.</span>
               </div>
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-3xl font-black tracking-tight">
+            )}
+
+            {/* Calculations preview */}
+            <div className="p-4 sm:p-6 bg-gradient-to-br from-[#06110B] to-[#122A1E] border border-primary/20 rounded-2xl sm:rounded-3xl text-white w-full max-w-full overflow-hidden">
+              <div className="flex flex-col sm:flex-row justify-between gap-4 sm:gap-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-widest">
+                    Estimasi Total
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black tracking-tight">
                     Rp {(requestedPrice * quantity).toLocaleString('id-ID')}
                   </p>
                   <p className="text-[10px] font-bold text-white/50 uppercase mt-1">
                     Sebelumnya: Rp {(originalPrice * quantity).toLocaleString('id-ID')}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xl font-black text-emerald-400">
+                <div className="sm:text-right space-y-1">
+                  <p className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-widest">
+                    Margin Penurunan
+                  </p>
+                  <p className="text-lg sm:text-xl font-black text-emerald-400">
                     -{(originalPrice > 0 ? ((originalPrice - requestedPrice) / originalPrice) * 100 : 0).toFixed(1)}%
                   </p>
                   <p className="text-[10px] font-bold text-white/50 uppercase mt-1">
@@ -246,20 +255,20 @@ export const NegotiationModal: React.FC<NegotiationModalProps> = ({
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex gap-4 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="flex-1 h-14 rounded-2xl border-border font-black text-sm uppercase tracking-wider"
+                className="w-full sm:flex-1 h-12 sm:h-14 rounded-xl sm:rounded-2xl border-border font-black text-xs sm:text-sm uppercase tracking-wider"
               >
                 Batal
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 h-14 rounded-2xl bg-primary text-primary-foreground font-black text-sm uppercase tracking-wider shadow-xl shadow-primary/20"
+                className="w-full sm:flex-1 h-12 sm:h-14 rounded-xl sm:rounded-2xl bg-primary text-primary-foreground font-black text-xs sm:text-sm uppercase tracking-wider shadow-xl shadow-primary/20"
               >
                 {isSubmitting ? (
                   <>

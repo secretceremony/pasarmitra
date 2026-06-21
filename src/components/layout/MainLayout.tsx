@@ -10,6 +10,7 @@ import {
   MapPin, 
   CreditCard, 
   ShieldCheck,
+  ShieldAlert,
   LogOut, 
   Menu, 
   X, 
@@ -33,8 +34,6 @@ import { useAuthStore } from '../../store/use-auth-store';
 import { useUIStore } from '../../store/use-ui-store';
 import { useCartStore } from '../../store/useCartStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
-import { CartSidebar } from '../../features/cart/components/CartSidebar';
-import { NotificationCenter } from '../common/NotificationCenter';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 
@@ -51,30 +50,28 @@ const CATEGORIES = [
 const UMKM_NAV_ITEMS = [
   { label: 'Dashboard', href: '/umkm/dashboard', icon: LayoutDashboard },
   { label: 'Marketplace', href: '/marketplace', icon: Store },
-  { label: 'Orders', href: '/orders', icon: ShoppingBag },
+  { label: 'Keranjang', href: '/umkm/cart', icon: ShoppingCart },
+  { label: 'Pesanan', href: '/orders', icon: ShoppingBag },
   { label: 'Negosiasi Harga', href: '/umkm/negosiasi-harga', icon: MessageSquareText },
-  { label: 'Profile / Settings', href: '/umkm/profile', icon: Settings },
+  { label: 'Komplain Saya', href: '/umkm/disputes', icon: ShieldAlert },
 ];
 
 const DISTRIBUTOR_NAV_ITEMS = [
   { label: 'Dashboard', href: '/distributor/dashboard', icon: LayoutDashboard },
-  { label: 'My Inventory', href: '/inventory', icon: Package },
-  { label: 'Orders', href: '/orders', icon: ShoppingBag },
+  { label: 'Inventaris', href: '/inventory', icon: Package },
+  { label: 'Pesanan Masuk', href: '/orders', icon: ShoppingBag },
   { label: 'Negosiasi Harga', href: '/distributor/negosiasi-harga', icon: MessageSquareText },
-  { label: 'Verification Docs', href: '/distributor/legal-docs', icon: ShieldCheck },
-  { label: 'Profile / Settings', href: '/distributor/profile', icon: Settings },
+  { label: 'Komplain Masuk', href: '/distributor/disputes', icon: ShieldAlert },
+  { label: 'Dokumen Legal', href: '/distributor/legal-docs', icon: ShieldCheck },
 ];
 
 const ADMIN_NAV_ITEMS = [
-  { label: 'Admin Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { label: 'Users', href: '/admin/users', icon: Users },
-  { label: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
-  { label: 'Platform Finance', href: '/admin/finances', icon: Wallet },
-  { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
-  { label: 'Moderation System', href: '/admin/moderation', icon: Handshake },
-  { label: 'Disputes / Refunds', href: '/admin/disputes', icon: ShieldCheck },
-  { label: 'Audit Logs', href: '/admin/audit', icon: Settings },
-  { label: 'Profile / Settings', href: '/admin/profile', icon: Settings },
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+  { label: 'Pengguna', href: '/admin/users', icon: Users },
+  { label: 'Verifikasi', href: '/admin/verifications', icon: ShieldCheck },
+  { label: 'Moderasi', href: '/admin/moderation', icon: Handshake },
+  { label: 'Sengketa', href: '/admin/disputes', icon: ShieldAlert },
+  { label: 'Log Audit', href: '/admin/audit', icon: Settings },
 ];
 
 export const MainLayout = () => {
@@ -85,13 +82,11 @@ export const MainLayout = () => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showCart, setShowCart] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1280);
+  const [isMd, setIsMd] = useState(window.innerWidth >= 768);
 
   const sidebarRef = useRef<HTMLElement>(null);
   const cartButtonRef = useRef<HTMLButtonElement>(null);
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1280);
 
   const isAdmin = user?.role === 'ADMIN';
   const isDistributor = user?.role === 'DISTRIBUTOR';
@@ -102,58 +97,15 @@ export const MainLayout = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const desktop = window.innerWidth >= 1280;
-      setIsDesktop(desktop);
-      if (desktop) {
-        document.body.style.overflow = '';
-      } else if (rightSidebarOpen && user?.role === 'UMKM') {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = '';
-      }
+      setIsDesktop(window.innerWidth >= 1280);
+      setIsMd(window.innerWidth >= 768);
     };
     window.addEventListener('resize', handleResize);
     handleResize(); // run initially
     return () => {
       window.removeEventListener('resize', handleResize);
-      document.body.style.overflow = '';
     };
-  }, [rightSidebarOpen, user?.role]);
-
-  // Click outside and keydown listeners (overlay mode only for UMKM sidebar)
-  useEffect(() => {
-    if (user?.role !== 'UMKM') return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (window.innerWidth >= 1280) return; // Only close click-outside in overlay mode
-      
-      if (
-        rightSidebarOpen &&
-        sidebarRef.current &&
-        !sidebarRef.current.contains(event.target as Node) &&
-        cartButtonRef.current &&
-        !cartButtonRef.current.contains(event.target as Node)
-      ) {
-        setRightSidebarOpen(false);
-        cartButtonRef.current?.focus();
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (window.innerWidth >= 1280) return; // Escape key behavior for overlay only
-      if (event.key === 'Escape' && rightSidebarOpen) {
-        setRightSidebarOpen(false);
-        cartButtonRef.current?.focus();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [rightSidebarOpen, user?.role]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans text-foreground overflow-x-hidden">
@@ -161,7 +113,7 @@ export const MainLayout = () => {
       <motion.aside
         initial={false}
         animate={{ width: sidebarOpen ? 300 : 96 }}
-        className="hidden md:flex flex-col bg-sidebar border-r border-sidebar-border sticky top-0 h-screen overflow-hidden z-50 shadow-2xl"
+        className="hidden md:flex flex-col bg-sidebar border-r border-sidebar-border fixed left-0 top-0 bottom-0 h-screen overflow-hidden z-50 shadow-2xl"
       >
         <div className="p-8">
           <Link to="/dashboard" className="flex items-center gap-4">
@@ -199,7 +151,7 @@ export const MainLayout = () => {
                 )} />
                 {sidebarOpen && <span className="font-black text-sm tracking-tight">{item.label}</span>}
                 {isActive && (
-                  <motion.div layoutId="active-nav" className="absolute left-0 w-1.5 h-8 bg-primary rounded-r-full shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
+                  <motion.div layoutId="active-nav" className="absolute left-0 w-1.5 h-8 bg-primary rounded-r-xl shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
                 )}
               </Link>
             );
@@ -213,13 +165,17 @@ export const MainLayout = () => {
             onClick={logout}
           >
             <LogOut size={22} className={sidebarOpen ? "" : "mx-auto"} />
-            {sidebarOpen && <span className="text-sm uppercase tracking-widest">Sign Out</span>}
+            {sidebarOpen && <span className="text-sm uppercase tracking-widest">Keluar</span>}
           </Button>
         </div>
       </motion.aside>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen relative bg-background">
+      <motion.div 
+        initial={false}
+        animate={{ paddingLeft: isMd ? (sidebarOpen ? 300 : 96) : 0 }}
+        className="flex-1 flex flex-col min-w-0 min-h-screen relative bg-background"
+      >
         {/* Top Navbar */}
         <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-2xl border-b border-border px-4 md:px-8 py-4 flex items-center gap-3 md:gap-12 h-20 md:h-24">
           <button className="md:hidden p-2 text-foreground bg-card rounded-xl border border-border" onClick={() => setMobileMenuOpen(true)}>
@@ -231,70 +187,48 @@ export const MainLayout = () => {
                 <Search className="absolute left-3.5 md:left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors w-4 h-4 md:w-5 md:h-5" />
                 <input 
                   type="text" 
-                  placeholder={isAdmin ? "Cari pengguna, distributor, produk, invoice, atau transaksi..." : "Search products, distributors or brands..."} 
+                  placeholder={isAdmin ? "Cari pengguna, distributor, produk, invoice, atau transaksi..." : "Cari produk, distributor, atau merek..."} 
                   className="w-full bg-card/60 border border-border/50 focus:border-primary/40 focus:bg-card pl-10 pr-4 md:px-14 py-2.5 md:py-4 rounded-2xl md:rounded-3xl text-xs md:text-sm transition-all focus:outline-none shadow-sm font-bold tracking-tight h-10 md:h-14"
                 />
               </div>
           </div>
 
-          <div className="flex items-center gap-1.5 md:gap-4">
+          <div className="flex items-center gap-1.5 md:gap-4 ml-auto">
             {!isAdmin && (
               <>
                 <div className="relative">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className={cn(
-                      "h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 relative hover:border-primary/30 transition-all",
-                      showNotifications && "border-primary/50 bg-primary/10"
-                    )}
-                    onClick={() => {
-                      setShowNotifications(!showNotifications);
-                      if (rightSidebarOpen) setRightSidebarOpen(false);
-                    }}
-                  >
-                     <Bell className={cn("w-5 h-5 md:w-6 md:h-6 text-muted-foreground", !showNotifications && unreadCount > 0 && "animate-bounce")} />
-                     {unreadCount > 0 && <span className="absolute top-2.5 right-2.5 md:top-4 md:right-4 w-2 h-2 md:w-2.5 md:h-2.5 bg-primary rounded-full border-2 border-background shadow-[0_0_10px_rgba(34,197,94,0.3)]" />}
-                  </Button>
-                  
-                  <AnimatePresence>
-                    {showNotifications && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute top-14 md:top-20 right-0 z-[60]"
-                      >
-                        <NotificationCenter />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                {user?.role && user?.role !== 'ADMIN' && (
-                  <Link to={user.role === 'UMKM' ? '/umkm/negosiasi-harga' : '/distributor/negosiasi-harga'}>
-                    <Button variant="outline" size="icon" className="h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all">
-                       <MessageSquareText className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
+                  <Link to="/notifications">
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className={cn(
+                        "h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 relative hover:border-primary/30 transition-all",
+                        location.pathname === "/notifications" && "border-primary/50 bg-primary/10"
+                      )}
+                    >
+                       <Bell className={cn("w-5 h-5 md:w-6 md:h-6 text-muted-foreground", location.pathname !== "/notifications" && unreadCount > 0 && "animate-bounce")} />
+                       {unreadCount > 0 && <span className="absolute top-2.5 right-2.5 md:top-4 md:right-4 w-2 h-2 md:w-2.5 md:h-2.5 bg-primary rounded-full border-2 border-background shadow-[0_0_10px_rgba(34,197,94,0.3)]" />}
                     </Button>
                   </Link>
-                )}
+                </div>
                 {user?.role === 'UMKM' && (
-                  <Button 
-                    ref={cartButtonRef}
-                    variant="outline" 
-                    size="icon" 
-                    className={cn("h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all relative", rightSidebarOpen && "bg-primary/10 border-primary/20 text-primary")}
-                    onClick={() => {
-                      setRightSidebarOpen(!rightSidebarOpen);
-                      if (showNotifications) setShowNotifications(false);
-                    }}
-                  >
-                     <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
-                     {totalItems() > 0 && (
-                       <span className="absolute -top-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-primary text-primary-foreground rounded-full border-2 border-background flex items-center justify-center text-[8px] md:text-[10px] font-black group-hover:scale-110 transition-transform">
-                         {totalItems()}
-                       </span>
-                     )}
-                  </Button>
+                  <Link to="/umkm/cart">
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className={cn(
+                        "h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-[1.25rem] border-border bg-card/40 hover:border-primary/30 transition-all relative", 
+                        location.pathname === "/umkm/cart" && "bg-primary/10 border-primary/20 text-primary"
+                      )}
+                    >
+                       <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
+                       {totalItems() > 0 && (
+                         <span className="absolute -top-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-primary text-primary-foreground rounded-full border-2 border-background flex items-center justify-center text-[8px] md:text-[10px] font-black group-hover:scale-110 transition-transform">
+                           {totalItems()}
+                         </span>
+                       )}
+                    </Button>
+                  </Link>
                 )}
 
               </>
@@ -302,17 +236,20 @@ export const MainLayout = () => {
 
             <div className="h-8 md:h-10 w-px bg-border mx-0.5 md:mx-2 opacity-50" />
 
-            <div className="flex items-center gap-4 pl-2 group cursor-pointer">
+            <Link 
+              to={isAdmin ? '/admin/profile' : isDistributor ? '/distributor/profile' : '/umkm/profile'} 
+              className="flex items-center gap-4 pl-2 group cursor-pointer hover:no-underline"
+            >
               <div className="flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity hidden xl:flex">
-                 <span className="text-sm font-black tracking-tight">{user?.email?.split('@')[0]}</span>
-                 <span className="text-[10px] font-black text-primary uppercase tracking-widest">Verified Partner</span>
+                 <span className="text-sm font-black tracking-tight text-foreground">{user?.email?.split('@')[0]}</span>
+                 <span className="text-[10px] font-black text-primary uppercase tracking-widest">Mitra Terverifikasi</span>
               </div>
-              <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/20 p-0.5 border-2 border-transparent group-hover:border-primary transition-all overflow-hidden shadow-lg">
+              <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/20 p-0.5 border-2 border-transparent group-hover:border-primary transition-all overflow-hidden shadow-lg shrink-0">
                  <div className="w-full h-full rounded-[10px] md:rounded-[14px] bg-primary flex items-center justify-center text-primary-foreground font-black text-sm md:text-xl">
                     {user?.email?.[0].toUpperCase()}
                  </div>
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 
@@ -321,44 +258,8 @@ export const MainLayout = () => {
           <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-12 scroll-smooth">
             <Outlet />
           </main>
-
-          {/* Right Sidebar */}
-          <AnimatePresence>
-            {user?.role === 'UMKM' && rightSidebarOpen && (
-              <>
-                {/* Backdrop for mobile/tablet overlay mode */}
-                {!isDesktop && (
-                  <div 
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-                    onClick={() => {
-                      setRightSidebarOpen(false);
-                      cartButtonRef.current?.focus();
-                    }}
-                  />
-                )}
-                <motion.aside
-                  ref={sidebarRef}
-                  initial={isDesktop ? { width: 0, opacity: 0 } : { x: '100%', opacity: 0 }}
-                  animate={isDesktop ? { width: 440, opacity: 1 } : { x: 0, opacity: 1 }}
-                  exit={isDesktop ? { width: 0, opacity: 0 } : { x: '100%', opacity: 0 }}
-                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                  className={cn(
-                    "flex flex-col bg-card/95 border-l border-border h-full overflow-hidden backdrop-blur-3xl transition-all duration-300",
-                    isDesktop 
-                      ? "w-[440px] sticky top-0" 
-                      : "fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[440px] shadow-2xl"
-                  )}
-                >
-                  <CartSidebar onClose={() => {
-                    setRightSidebarOpen(false);
-                    cartButtonRef.current?.focus();
-                  }} />
-                </motion.aside>
-              </>
-            )}
-          </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
 
       {/* Mobile Menu */}
       <AnimatePresence>
@@ -403,7 +304,7 @@ export const MainLayout = () => {
                   }}
                 >
                   <LogOut size={22} />
-                  <span className="text-sm uppercase tracking-widest">Sign Out</span>
+                  <span className="text-sm uppercase tracking-widest">Keluar</span>
                 </Button>
               </div>
           </motion.div>
