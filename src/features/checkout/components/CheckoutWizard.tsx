@@ -672,42 +672,56 @@ export const CheckoutWizard = () => {
            <div className="p-5 sm:p-8 md:p-10 bg-card border border-border/50 rounded-2xl sm:rounded-[2.5rem] md:rounded-[3rem] shadow-2xl space-y-6 sm:space-y-8 md:space-y-10 lg:sticky lg:top-10 max-h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
               <h3 className="text-xl sm:text-2xl font-black tracking-tight">Ringkasan Pesanan</h3>
               <div className="space-y-4 sm:space-y-6">
-                 {items.length > 0 ? items.map((item) => (
-                    <div key={item.id} className="flex gap-3 sm:gap-4 group items-center">
-                       <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-muted overflow-hidden shrink-0 border border-border">
-                          <img src={item.image_url || '/assets/fallback-product.png'} className="w-full h-full object-cover" alt={item.name} />
-                       </div>
-                       <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-black truncate leading-tight group-hover:text-primary transition-colors">{item.name}</p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">{item.quantity} {item.unit_type}</p>
-                       </div>
-                       <p className="text-xs sm:text-sm font-black italic shrink-0">Rp {(item.price * item.quantity).toLocaleString()}</p>
-                    </div>
-                 )) : (
-                    <p className="text-muted-foreground italic text-sm font-medium">Keranjang kosong...</p>
-                 )}
-              </div>
+                  {items.length > 0 ? items.map((item) => (
+                     <div key={item.id} className="flex gap-3 sm:gap-4 group items-center">
+                        <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-muted overflow-hidden shrink-0 border border-border">
+                           <img 
+                              src={item.image_url || '/assets/fallback-product.png'} 
+                              className="w-full h-full object-cover" 
+                              alt={item.name} 
+                              onError={(e) => {
+                                 const target = e.currentTarget;
+                                 if (target.src !== '/assets/fallback-product.png') {
+                                    target.src = '/assets/fallback-product.png';
+                                 }
+                              }}
+                           />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <p className="text-xs sm:text-sm font-black truncate leading-tight group-hover:text-primary transition-colors">{item.name}</p>
+                           <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">{item.quantity} {item.unit_type} • Rp{item.price.toLocaleString('id-ID')}</p>
+                        </div>
+                        <p className="text-xs sm:text-sm font-black italic shrink-0">Rp{(item.price * item.quantity).toLocaleString('id-ID')}</p>
+                     </div>
+                  )) : (
+                     <p className="text-muted-foreground italic text-sm font-medium">Keranjang kosong...</p>
+                  )}
+               </div>
 
-              <div className="pt-6 sm:pt-8 border-t border-border/50 space-y-3 sm:space-y-4">
-                 <div className="flex justify-between text-xs sm:text-sm font-bold text-muted-foreground">
-                    <span>Subtotal</span>
-                    <span className="font-black text-foreground">Rp {totalPrice().toLocaleString()}</span>
-                 </div>
-                 <div className="flex justify-between text-xs sm:text-sm font-bold text-muted-foreground">
-                    <span>Biaya Pengiriman</span>
-                    <span className="text-primary font-black uppercase">
-                      {selectedShipping === 1 ? 'Rp 25.000' : 'GRATIS'}
-                    </span>
-                 </div>
-                 <div className="pt-4 flex justify-between items-end border-t border-border/30">
-                    <div className="space-y-1">
-                       <p className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-widest">Total Pembayaran</p>
-                       <p className="text-2xl sm:text-3xl font-black tracking-tighter">
-                         Rp {(totalPrice() + getShippingCost()).toLocaleString()}
-                       </p>
-                    </div>
-                 </div>
-              </div>
+               <div className="pt-6 sm:pt-8 border-t border-border/50 space-y-3 sm:space-y-4">
+                  <div className="flex justify-between text-xs sm:text-sm font-bold text-muted-foreground">
+                     <span>Subtotal Produk</span>
+                     <span className="font-black text-foreground">Rp{totalPrice().toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm font-bold text-muted-foreground">
+                     <span>Biaya Layanan</span>
+                     <span className="font-black text-emerald-400">Rp0</span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm font-bold text-muted-foreground">
+                     <span>Ongkir / Estimasi Pengiriman</span>
+                     <span className="font-black text-foreground">
+                       Rp{getShippingCost().toLocaleString('id-ID')}
+                     </span>
+                  </div>
+                  <div className="pt-4 flex justify-between items-end border-t border-border/30">
+                     <div className="space-y-1">
+                        <p className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-widest">Total Pembayaran</p>
+                        <p className="text-2xl sm:text-3xl font-black tracking-tighter">
+                          Rp{(totalPrice() + getShippingCost()).toLocaleString('id-ID')}
+                        </p>
+                     </div>
+                  </div>
+               </div>
 
                 {step < 3 && (
                   <Button 

@@ -194,23 +194,6 @@ export const DistributorProfile = () => {
                   ))}
                </div>
             </div>
-
-            <div className="bg-[#06110B] border border-primary/20 rounded-[3rem] p-10 space-y-6 text-white shadow-2xl relative overflow-hidden">
-               <h3 className="text-xl font-black text-primary flex items-center gap-2">
-                  <Award size={24} /> Keuntungan Distributor
-               </h3>
-               <div className="space-y-4 relative z-10">
-                  {distributor.badges.map((badge) => (
-                    <div key={badge} className="flex items-center gap-4 group">
-                       <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
-                          <CheckCircle2 size={16} />
-                       </div>
-                       <span className="text-sm font-bold text-white/80">{badge}</span>
-                    </div>
-                  ))}
-               </div>
-               <TrendingUp className="absolute -bottom-10 -right-10 text-primary/5 w-64 h-64" />
-            </div>
          </div>
 
          {/* Main Content */}

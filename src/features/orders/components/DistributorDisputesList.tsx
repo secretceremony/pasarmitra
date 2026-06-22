@@ -15,6 +15,7 @@ import { disputeService, Dispute } from '../services/disputeService';
 import { formatDateTime } from '../../../lib/dateUtils';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { Button } from '../../../components/ui/button';
+import { Pagination } from '../../../components/common/Pagination';
 
 export const DistributorDisputesList = () => {
   const navigate = useNavigate();
@@ -22,6 +23,11 @@ export const DistributorDisputesList = () => {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const fetchDisputes = async () => {
     if (!user?.id) return;
@@ -153,53 +159,64 @@ export const DistributorDisputesList = () => {
           </div>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDisputes.map((dispute) => (
-            <motion.div
-              key={dispute.id}
-              onClick={() => navigate(`/distributor/disputes/${dispute.id}`)}
-              className="p-5 bg-card border border-border/50 rounded-2xl hover:border-[#A35139]/30 cursor-pointer transition-all hover:scale-[1.01] shadow-lg flex flex-col justify-between space-y-4 group"
-            >
-              <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                  <StatusBadge 
-                    type={getStatusType(dispute.status)} 
-                    label={getStatusLabel(dispute.status)} 
-                  />
-                  <span className="text-[9px] font-mono font-black text-muted-foreground uppercase tracking-wider">#{dispute.id.slice(0, 8)}</span>
+        <div className="space-y-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredDisputes.slice((currentPage - 1) * 10, currentPage * 10).map((dispute) => (
+              <motion.div
+                key={dispute.id}
+                onClick={() => navigate(`/distributor/disputes/${dispute.id}`)}
+                className="p-5 bg-card border border-border/50 rounded-2xl hover:border-[#A35139]/30 cursor-pointer transition-all hover:scale-[1.01] shadow-lg flex flex-col justify-between space-y-4 group"
+              >
+                <div className="space-y-3">
+                  <div className="flex justify-between items-start">
+                    <StatusBadge 
+                      type={getStatusType(dispute.status)} 
+                      label={getStatusLabel(dispute.status)} 
+                    />
+                    <span className="text-[9px] font-mono font-black text-muted-foreground uppercase tracking-wider">#{dispute.id.slice(0, 8)}</span>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h4 className="font-black text-sm leading-tight group-hover:text-[#A35139] transition-colors">
+                      {dispute.title}
+                    </h4>
+                    <p className="text-[10px] text-muted-foreground font-bold">
+                      Pesanan: <span className="text-foreground">#{dispute.order_code || dispute.order_id.slice(0, 8)}</span>
+                    </p>
+                  </div>
                 </div>
-                
-                <div className="space-y-1">
-                  <h4 className="font-black text-sm leading-tight group-hover:text-[#A35139] transition-colors">
-                    {dispute.title}
-                  </h4>
-                  <p className="text-[10px] text-muted-foreground font-bold">
-                    Pesanan: <span className="text-foreground">#{dispute.order_code || dispute.order_id.slice(0, 8)}</span>
-                  </p>
-                </div>
-              </div>
 
-              <div className="pt-3 border-t border-border/30 space-y-2 text-xs font-bold text-muted-foreground">
-                <div className="flex items-center gap-1.5 text-[10px]">
-                  <User size={12} className="shrink-0" />
-                  <span className="truncate">{dispute.buyer_name}</span>
+                <div className="pt-3 border-t border-border/30 space-y-2 text-xs font-bold text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <User size={12} className="shrink-0" />
+                    <span className="truncate">{dispute.buyer_name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <FileText size={12} className="shrink-0" />
+                    <span>Solusi Diminta: <span className="text-[#A35139] font-black">{getResolutionLabel(dispute.requested_resolution)}</span></span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[9px] text-muted-foreground font-medium flex items-center gap-1">
+                      <Clock size={10} />
+                      {formatDateTime(dispute.created_at)}
+                    </span>
+                    <span className="text-[#A35139] font-black text-[10px] flex items-center gap-0.5">
+                      Tinjau <ArrowRight size={10} />
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-[10px]">
-                  <FileText size={12} className="shrink-0" />
-                  <span>Solusi Diminta: <span className="text-[#A35139] font-black">{getResolutionLabel(dispute.requested_resolution)}</span></span>
-                </div>
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[9px] text-muted-foreground font-medium flex items-center gap-1">
-                    <Clock size={10} />
-                    {formatDateTime(dispute.created_at)}
-                  </span>
-                  <span className="text-[#A35139] font-black text-[10px] flex items-center gap-0.5">
-                    Tinjau <ArrowRight size={10} />
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
+          </div>
+          {filteredDisputes.length > 10 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredDisputes.length / 10)}
+              onPageChange={setCurrentPage}
+              totalItems={filteredDisputes.length}
+              itemsPerPage={10}
+            />
+          )}
         </div>
       )}
     </div>

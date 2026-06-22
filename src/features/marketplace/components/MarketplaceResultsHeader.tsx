@@ -5,9 +5,11 @@ import { MARKETPLACE_UI_STRINGS, MARKETPLACE_SORT_OPTIONS } from "../config/mark
 
 interface MarketplaceResultsHeaderProps {
   count: number;
+  sortBy: string;
+  onSortChange: (val: string) => void;
 }
 
-export function MarketplaceResultsHeader({ count }: MarketplaceResultsHeaderProps) {
+export function MarketplaceResultsHeader({ count, sortBy, onSortChange }: MarketplaceResultsHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between pb-4 border-b border-border/30 w-full">
        <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
@@ -19,9 +21,17 @@ export function MarketplaceResultsHeader({ count }: MarketplaceResultsHeaderProp
        </div>
        <div className="flex items-center gap-2 sm:gap-4 justify-between sm:justify-start">
           <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">{MARKETPLACE_UI_STRINGS.sortBy}</span>
-          <Button variant="ghost" className="text-xs font-black uppercase gap-2 hover:bg-primary/5 hover:text-primary h-9 sm:h-10 px-3">
-             {MARKETPLACE_SORT_OPTIONS[0].label} <ChevronRight size={14} />
-          </Button>
+          <select
+            value={sortBy}
+            onChange={(e) => onSortChange(e.target.value)}
+            className="text-xs font-black uppercase bg-card border border-border/60 rounded-xl px-3 py-1.5 h-9 sm:h-10 focus:outline-none focus:border-primary cursor-pointer hover:bg-primary/5 hover:text-primary transition-colors text-foreground"
+          >
+            {MARKETPLACE_SORT_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id} className="font-sans normal-case text-foreground bg-card">
+                {opt.label}
+              </option>
+            ))}
+          </select>
        </div>
     </div>
   );

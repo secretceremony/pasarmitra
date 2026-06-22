@@ -38,6 +38,12 @@ export function MarketplaceProductCard({ product, onAddToCart, onDistributorClic
           src={product.image} 
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
           alt={product.name} 
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (target.src !== '/assets/fallback-product.png') {
+              target.src = '/assets/fallback-product.png';
+            }
+          }}
         />
          <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
             <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-slate-900/95 text-white border border-slate-800 dark:bg-slate-100/95 dark:text-slate-900 dark:border-slate-200 shadow-sm backdrop-blur-md">

@@ -1,13 +1,10 @@
 import * as React from "react";
 import { Filter } from "lucide-react";
 import { Button } from "../../../components/ui/button";
-import { MarketplaceSearch } from "./MarketplaceSearch";
 import { MarketplaceCategoryTabs } from "./MarketplaceCategoryTabs";
 import { cn } from "../../../lib/utils";
 
 interface MarketplaceToolbarProps {
-  search: string;
-  onSearchChange: (value: string) => void;
   categories: readonly string[];
   selectedCategory: string;
   onCategorySelect: (category: string) => void;
@@ -16,8 +13,6 @@ interface MarketplaceToolbarProps {
 }
 
 export function MarketplaceToolbar({
-  search,
-  onSearchChange,
   categories,
   selectedCategory,
   onCategorySelect,
@@ -26,8 +21,6 @@ export function MarketplaceToolbar({
 }: MarketplaceToolbarProps) {
   return (
     <div className="flex flex-col md:flex-row gap-6">
-      <MarketplaceSearch value={search} onChange={onSearchChange} />
-      
       <div className="flex gap-2 sm:gap-4 flex-1 min-w-0 items-center">
         <div className="flex-1 min-w-0">
           <MarketplaceCategoryTabs 

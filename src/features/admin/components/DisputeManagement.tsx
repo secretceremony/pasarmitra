@@ -33,6 +33,7 @@ import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
 import { formatDateTime } from '../../../lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
+import { Pagination } from '../../../components/common/Pagination';
 
 export const DisputeManagement = () => {
   const navigate = useNavigate();
@@ -40,7 +41,12 @@ export const DisputeManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const { user: currentUser } = useAuthStore();
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Decision states
@@ -213,7 +219,12 @@ export const DisputeManagement = () => {
       (d.reason || '').toLowerCase().includes(term)
     );
   });
-
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredDisputes.length / itemsPerPage);
+  const paginatedDisputes = filteredDisputes.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
   const getDisputeStatusLabel = (dispute: any) => {
     const statusStr = (dispute.status || '').toLowerCase();
     
@@ -343,38 +354,47 @@ export const DisputeManagement = () => {
                        </div>
                     </div>
                 ) : (
-                   filteredDisputes.map((dispute) => (
-                      <motion.div
-                        key={dispute.id}
-                        onClick={() => setSelectedId(dispute.id)}
-                        className={cn(
-                          "p-5 sm:p-8 bg-card border rounded-2xl sm:rounded-[2.5rem] cursor-pointer transition-all hover:scale-[1.01] shadow-xl relative overflow-hidden group w-full min-w-0 max-w-full",
-                          selectedId === dispute.id ? "border-[#A35139] ring-2 ring-[#A35139]/20" : "border-border/50 hover:border-[#A35139]/30"
-                        )}
-                      >
-                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6 min-w-0">
-                            <div className="shrink-0">
-                              <StatusBadge 
-                               type={getDisputeStatusType(dispute)} 
-                               label={getDisputeStatusLabel(dispute)} 
-                              />
-                            </div>
-                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest break-all">{dispute.id}</span>
-                         </div>
-                         <div className="space-y-4 min-w-0">
-                            <h4 className="text-lg sm:text-xl font-black tracking-tight leading-tight group-hover:text-[#A35139] transition-colors break-words">{dispute.reason}</h4>
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs font-bold text-muted-foreground min-w-0">
-                               <span className="flex items-center gap-1 min-w-0 truncate"><User size={12} className="shrink-0" /> <span className="truncate">{dispute.claimant || dispute.buyer_name || '-'}</span></span>
-                               <ArrowRight size={12} className="text-border shrink-0 rotate-90 sm:rotate-0" />
-                               <span className="flex items-center gap-1 min-w-0 truncate"><Building2 size={12} className="shrink-0" /> <span className="truncate">{dispute.defendant || dispute.distributor_name || '-'}</span></span>
-                            </div>
-                         </div>
-                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-6 pt-4 border-t border-border/30 min-w-0">
-                            <span className="text-lg font-black italic">{dispute.amount || '-'}</span>
-                            <span className="text-[10px] font-black text-muted-foreground flex items-center gap-2 shrink-0"><Clock size={12} /> {formatDisputeDate(dispute)}</span>
-                         </div>
-                      </motion.div>
-                    ))
+                    <>
+                       {paginatedDisputes.map((dispute) => (
+                          <motion.div
+                            key={dispute.id}
+                            onClick={() => setSelectedId(dispute.id)}
+                            className={cn(
+                              "p-5 sm:p-8 bg-card border rounded-2xl sm:rounded-[2.5rem] cursor-pointer transition-all hover:scale-[1.01] shadow-xl relative overflow-hidden group w-full min-w-0 max-w-full",
+                              selectedId === dispute.id ? "border-[#A35139] ring-2 ring-[#A35139]/20" : "border-border/50 hover:border-[#A35139]/30"
+                            )}
+                          >
+                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6 min-w-0">
+                                <div className="shrink-0">
+                                  <StatusBadge 
+                                   type={getDisputeStatusType(dispute)} 
+                                   label={getDisputeStatusLabel(dispute)} 
+                                  />
+                                </div>
+                                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest break-all">{dispute.id}</span>
+                             </div>
+                             <div className="space-y-4 min-w-0">
+                                <h4 className="text-lg sm:text-xl font-black tracking-tight leading-tight group-hover:text-[#A35139] transition-colors break-words">{dispute.reason}</h4>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs font-bold text-muted-foreground min-w-0">
+                                   <span className="flex items-center gap-1 min-w-0 truncate"><User size={12} className="shrink-0" /> <span className="truncate">{dispute.claimant || dispute.buyer_name || '-'}</span></span>
+                                   <ArrowRight size={12} className="text-border shrink-0 rotate-90 sm:rotate-0" />
+                                   <span className="flex items-center gap-1 min-w-0 truncate"><Building2 size={12} className="shrink-0" /> <span className="truncate">{dispute.defendant || dispute.distributor_name || '-'}</span></span>
+                                </div>
+                             </div>
+                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-6 pt-4 border-t border-border/30 min-w-0">
+                                <span className="text-lg font-black italic">{dispute.amount || '-'}</span>
+                                <span className="text-[10px] font-black text-muted-foreground flex items-center gap-2 shrink-0"><Clock size={12} /> {formatDisputeDate(dispute)}</span>
+                             </div>
+                          </motion.div>
+                       ))}
+                       <Pagination
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          onPageChange={setCurrentPage}
+                          totalItems={filteredDisputes.length}
+                          itemsPerPage={itemsPerPage}
+                       />
+                    </>
                  )}
             </div>
          </div>

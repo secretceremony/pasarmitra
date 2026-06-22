@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, 
@@ -87,9 +87,14 @@ export const MainLayout = () => {
   const { notifications } = useNotificationStore();
   const unreadCount = notifications.filter(n => !n.is_read).length;
   const location = useLocation();
+  const navigate = useNavigate();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1280);
   const [isMd, setIsMd] = useState(window.innerWidth >= 768);
+
+  const [avatarError, setAvatarError] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
 
   const sidebarRef = useRef<HTMLElement>(null);
   const cartButtonRef = useRef<HTMLButtonElement>(null);
@@ -100,6 +105,41 @@ export const MainLayout = () => {
   let navItems = UMKM_NAV_ITEMS;
   if (isAdmin) navItems = ADMIN_NAV_ITEMS;
   else if (isDistributor) navItems = DISTRIBUTOR_NAV_ITEMS;
+
+  // Reset avatar load error state when user changes or updates avatar_url
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.avatar_url, user?.id]);
+
+  // Sync search input state with URL search param on load/navigation
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setSearchValue(params.get('search') || '');
+  }, [location.search]);
+
+  // Debounce search route navigation (300ms)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const urlSearch = params.get('search') || '';
+    if (searchValue === urlSearch) return;
+
+    const timer = setTimeout(() => {
+      const newParams = new URLSearchParams(location.search);
+      if (searchValue.trim()) {
+        newParams.set('search', searchValue.trim());
+      } else {
+        newParams.delete('search');
+      }
+
+      if (location.pathname === '/marketplace') {
+        navigate({ search: newParams.toString() }, { replace: true });
+      } else {
+        navigate(`/marketplace?${newParams.toString()}`);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchValue, navigate, location.pathname, location.search]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -193,10 +233,21 @@ export const MainLayout = () => {
                 <Search className="absolute left-3.5 md:left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors w-4 h-4 md:w-5 md:h-5" />
                 <input 
                   type="text" 
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
                   placeholder={isAdmin ? "Cari pengguna, distributor, produk, invoice, atau transaksi..." : "Cari produk, distributor, atau merek..."} 
-                  className="w-full bg-card/60 border border-border/50 focus:border-primary/40 focus:bg-card pl-10 pr-4 md:px-14 py-2.5 md:py-4 rounded-2xl md:rounded-3xl text-xs md:text-sm transition-all focus:outline-none shadow-sm font-bold tracking-tight h-10 md:h-14"
+                  className="w-full bg-card/60 border border-border/50 focus:border-primary/40 focus:bg-card pl-10 pr-10 md:pl-14 md:pr-14 py-2.5 md:py-4 rounded-2xl md:rounded-3xl text-xs md:text-sm transition-all focus:outline-none shadow-sm font-bold tracking-tight h-10 md:h-14"
                 />
-              </div>
+                {searchValue && (
+                  <button 
+                    onClick={() => setSearchValue('')}
+                    className="absolute right-3.5 md:right-5 top-1/2 -translate-y-1/2 p-1.5 hover:bg-muted rounded-lg transition-all cursor-pointer flex items-center justify-center border-none bg-transparent"
+                    title="Bersihkan pencarian"
+                  >
+                    <X className="w-4.5 h-4.5 text-muted-foreground hover:text-foreground" />
+                  </button>
+                )}
+             </div>
           </div>
 
           <div className="flex items-center gap-1.5 md:gap-4 ml-auto">
@@ -257,20 +308,29 @@ export const MainLayout = () => {
 
             <div className="h-8 md:h-10 w-px bg-border mx-0.5 md:mx-2 opacity-50" />
 
-            <Link 
-              to={isAdmin ? '/admin/profile' : isDistributor ? '/distributor/profile' : '/umkm/profile'} 
-              className="flex items-center gap-4 pl-2 group cursor-pointer hover:no-underline"
-            >
-              <div className="flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity hidden xl:flex">
-                 <span className="text-sm font-black tracking-tight text-foreground">{user?.email?.split('@')[0]}</span>
-                 <span className="text-[10px] font-black text-primary uppercase tracking-widest">Mitra Terverifikasi</span>
-              </div>
-              <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/20 p-0.5 border-2 border-transparent group-hover:border-primary transition-all overflow-hidden shadow-lg shrink-0">
-                 <div className="w-full h-full rounded-[10px] md:rounded-[14px] bg-primary flex items-center justify-center text-primary-foreground font-black text-sm md:text-xl">
-                    {user?.email?.[0].toUpperCase()}
-                 </div>
-              </div>
-            </Link>
+             <Link 
+               to={isAdmin ? '/admin/profile' : isDistributor ? '/distributor/profile' : '/umkm/profile'} 
+               className="flex items-center gap-4 pl-2 group cursor-pointer hover:no-underline"
+             >
+               <div className="flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity hidden xl:flex">
+                  <span className="text-sm font-black tracking-tight text-foreground">{user?.email?.split('@')[0]}</span>
+                  <span className="text-[10px] font-black text-primary uppercase tracking-widest">Mitra Terverifikasi</span>
+               </div>
+               <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/20 p-0.5 border-2 border-transparent group-hover:border-primary transition-all overflow-hidden shadow-lg shrink-0 flex items-center justify-center">
+                  {user?.avatar_url && !avatarError ? (
+                    <img 
+                      src={user.avatar_url} 
+                      alt="Avatar" 
+                      className="w-full h-full rounded-[10px] md:rounded-[14px] object-cover" 
+                      onError={() => setAvatarError(true)}
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-[10px] md:rounded-[14px] bg-primary flex items-center justify-center text-primary-foreground font-black text-sm md:text-xl select-none">
+                       {user?.email?.[0].toUpperCase()}
+                    </div>
+                  )}
+               </div>
+             </Link>
           </div>
         </header>
 

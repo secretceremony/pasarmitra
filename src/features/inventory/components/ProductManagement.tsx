@@ -20,6 +20,7 @@ import { inventoryService, Product } from '../services/inventoryService';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Pagination } from '../../../components/common/Pagination';
 
 export const ProductManagement = () => {
   const { user } = useAuthStore();
@@ -33,6 +34,11 @@ export const ProductManagement = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   // Form State
   const [name, setName] = useState('');
@@ -185,6 +191,13 @@ export const ProductManagement = () => {
     product.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const lowStockCount = products.filter(p => p.stock < 100).length;
 
   return (
@@ -323,7 +336,7 @@ export const ProductManagement = () => {
                         </td>
                       </tr>
                     ) : (
-                     filteredProducts.map((product) => (
+                     paginatedProducts.map((product) => (
                        <motion.tr 
                          key={product.id}
                          initial={{ opacity: 0 }}
@@ -393,9 +406,17 @@ export const ProductManagement = () => {
                 </tbody>
              </table>
           </div>
-          <div className="p-4 border-t border-border flex items-center justify-between bg-muted/10">
-             <p className="text-xs font-bold text-muted-foreground">Menampilkan {filteredProducts.length} dari {products.length} produk</p>
-          </div>
+          {filteredProducts.length > 0 && (
+             <div className="px-4 py-2 border-t border-border bg-muted/10">
+                <Pagination
+                   currentPage={currentPage}
+                   totalPages={totalPages}
+                   onPageChange={setCurrentPage}
+                   totalItems={filteredProducts.length}
+                   itemsPerPage={itemsPerPage}
+                />
+             </div>
+          )}
        </div>
 
       {/* Simplified Add Modal Layer */}

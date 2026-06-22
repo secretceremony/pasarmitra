@@ -23,7 +23,9 @@ import { useAuthStore } from '../../../store/use-auth-store';
 import { createAuditLog } from '../services/adminService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
+import { Pagination } from '../../../components/common/Pagination';
 import { formatDateTime } from '../../../lib/dateUtils';
+import { getStatusLabel as getCentralStatusLabel } from '../../../lib/statusUtils';
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -35,6 +37,11 @@ export const DistributorVerification = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [auditNote, setAuditNote] = useState('');
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, activeTab]);
   const { user: currentUser } = useAuthStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchParams] = useSearchParams();
@@ -381,6 +388,13 @@ export const DistributorVerification = () => {
     app.company.toLowerCase().includes(search.toLowerCase())
   );
 
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredApplications.length / itemsPerPage);
+  const paginatedApplications = filteredApplications.slice(
+    (currentPage - 1) * itemsPerPage,
+    (currentPage - 1) * itemsPerPage + itemsPerPage
+  );
+
   const getStatusType = (status: string) => {
     switch (status) {
       case 'VERIFIED': return 'success';
@@ -394,15 +408,7 @@ export const DistributorVerification = () => {
   };
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'VERIFIED': return 'Terverifikasi';
-      case 'PENDING_REVIEW': return 'Menunggu Review';
-      case 'PENDING': return 'Menunggu Review';
-      case 'REJECTED': return 'Ditolak';
-      case 'NEEDS_REVISION': return 'Perlu Revisi';
-      case 'ESCALATED': return 'Dieskalasikan';
-      default: return status || '-';
-    }
+    return getCentralStatusLabel(status);
   };
 
   const getDocStatusType = (status: string) => {
@@ -426,6 +432,33 @@ export const DistributorVerification = () => {
       default: return 'Belum Ada';
     }
   };
+
+  const getStats = () => {
+    let verified = 0;
+    let rejected = 0;
+    let pending = 0;
+    let unverified = 0;
+
+    applications.forEach((app) => {
+      if (app.role !== 'DISTRIBUTOR') return;
+      const status = (app.verification_status || app.status || '').toUpperCase();
+      const isVerified = app.is_verified === true;
+
+      if (isVerified || status === 'VERIFIED' || status === 'APPROVED') {
+        verified++;
+      } else if (status === 'REJECTED') {
+        rejected++;
+      } else if (status === 'PENDING' || status === 'PENDING_REVIEW' || status === 'NEEDS_REVISION') {
+        pending++;
+      } else {
+        unverified++;
+      }
+    });
+
+    return { verified, rejected, pending, unverified };
+  };
+
+  const stats = getStats();
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden px-4 sm:px-0">
@@ -458,6 +491,49 @@ export const DistributorVerification = () => {
             <div>
                <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest leading-none mb-0.5">Rata-rata Peninjauan</p>
                <p className="text-sm font-black italic leading-none">4.2 Jam</p>
+            </div>
+         </div>
+      </div>
+
+      {/* Stats Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+         <div className="bg-card border border-border/50 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+            <div>
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Verifikasi Berhasil</p>
+               <h3 className="text-2xl font-black text-emerald-600">{stats.verified}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+               <CheckCircle2 size={20} />
+            </div>
+         </div>
+
+         <div className="bg-card border border-border/50 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+            <div>
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Ditolak</p>
+               <h3 className="text-2xl font-black text-rose-600">{stats.rejected}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+               <XCircle size={20} />
+            </div>
+         </div>
+
+         <div className="bg-card border border-border/50 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+            <div>
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Direview</p>
+               <h3 className="text-2xl font-black text-amber-600">{stats.pending}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+               <Clock size={20} />
+            </div>
+         </div>
+
+         <div className="bg-card border border-border/50 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+            <div>
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Belum Diverifikasi</p>
+               <h3 className="text-2xl font-black text-muted-foreground">{stats.unverified}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-muted/50 text-muted-foreground flex items-center justify-center">
+               <Scale size={20} />
             </div>
          </div>
       </div>
@@ -517,7 +593,7 @@ export const DistributorVerification = () => {
                     </p>
                   </div>
                 ) : (
-                  filteredApplications.map((app) => (
+                  paginatedApplications.map((app) => (
                     <motion.div
                       key={app.id}
                       onClick={() => setSelectedId(app.id)}
@@ -563,6 +639,15 @@ export const DistributorVerification = () => {
                   ))
                 )}
              </div>
+              <div className="pt-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={filteredApplications.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
           </div>
 
           {/* Right panel — fluid */}

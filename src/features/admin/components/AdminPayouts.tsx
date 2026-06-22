@@ -28,6 +28,7 @@ import {
 } from 'firebase/firestore';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { Button } from '../../../components/ui/button';
+import { Pagination } from '../../../components/common/Pagination';
 import { createAuditLog } from '../services/adminService';
 import { toast } from 'sonner';
 
@@ -36,6 +37,12 @@ export const AdminPayouts = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, searchQuery]);
   
   // Modal states
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
@@ -196,9 +203,23 @@ export const AdminPayouts = () => {
   };
 
   const filteredRequests = requests.filter(req => {
-    if (filterStatus === 'all') return true;
-    return req.status === filterStatus;
+    if (filterStatus !== 'all' && req.status !== filterStatus) return false;
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      (req.distributor_name && req.distributor_name.toLowerCase().includes(term)) ||
+      (req.bank_name && req.bank_name.toLowerCase().includes(term)) ||
+      (req.bank_account_number && req.bank_account_number.toLowerCase().includes(term)) ||
+      (req.id && req.id.toLowerCase().includes(term))
+    );
   });
+
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const paginatedRequests = filteredRequests.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-4 py-6">
@@ -230,27 +251,39 @@ export const AdminPayouts = () => {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { label: 'Semua', val: 'all' },
-          { label: 'Menunggu Review', val: 'pending_review' },
-          { label: 'Disetujui', val: 'approved' },
-          { label: 'Ditolak', val: 'rejected' },
-          { label: 'Sudah Dibayar', val: 'paid' }
-        ].map(tab => (
-          <button
-            key={tab.val}
-            onClick={() => setFilterStatus(tab.val)}
-            className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
-              filterStatus === tab.val
-                ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/10'
-                : 'bg-card text-muted-foreground border-border/60 hover:text-foreground hover:border-primary/20'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: 'Semua', val: 'all' },
+            { label: 'Menunggu Review', val: 'pending_review' },
+            { label: 'Disetujui', val: 'approved' },
+            { label: 'Ditolak', val: 'rejected' },
+            { label: 'Sudah Dibayar', val: 'paid' }
+          ].map(tab => (
+            <button
+              key={tab.val}
+              onClick={() => setFilterStatus(tab.val)}
+              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
+                filterStatus === tab.val
+                  ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/10'
+                  : 'bg-card text-muted-foreground border-border/60 hover:text-foreground hover:border-primary/20'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative group w-full md:w-72">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Cari distributor atau bank..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 bg-card border border-border/60 pl-10 pr-4 rounded-xl text-xs font-bold outline-none focus:border-primary/40 focus:bg-card transition-all font-sans text-foreground"
+          />
+        </div>
       </div>
 
       {/* Main Table */}
@@ -266,62 +299,73 @@ export const AdminPayouts = () => {
               Tidak ada pengajuan pencairan dalam filter ini.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                <thead>
-                  <tr className="bg-muted/40 border-b border-border/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    <th className="p-4">Tanggal Pengajuan</th>
-                    <th className="p-4">Distributor</th>
-                    <th className="p-4">Informasi Rekening</th>
-                    <th className="p-4 text-right">Jumlah</th>
-                    <th className="p-4 text-center">Status</th>
-                    <th className="p-4 text-center">Tindakan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/20 font-bold">
-                  {filteredRequests.map((req) => (
-                    <tr key={req.id} className="hover:bg-muted/10">
-                      <td className="p-4 text-muted-foreground font-mono">
-                        {req.requested_at.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
-                      </td>
-                      <td className="p-4 text-foreground font-black">
-                        {req.distributor_name}
-                      </td>
-                      <td className="p-4 text-foreground text-xs leading-normal">
-                        <div className="flex items-center gap-1 font-black text-muted-foreground uppercase text-[10px]">
-                          <Building size={10} /> {req.bank_name}
-                        </div>
-                        <div className="font-mono mt-0.5">{req.bank_account_number}</div>
-                        <div className="text-[10px] text-muted-foreground">a.n. {req.bank_account_holder}</div>
-                      </td>
-                      <td className="p-4 text-right font-mono font-black text-foreground">
-                        Rp {req.amount.toLocaleString('id-ID')}
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-full border ${
-                          req.status === 'pending_review' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                          req.status === 'approved' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
-                          req.status === 'paid' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                          "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                        }`}>
-                          {req.status === 'pending_review' ? 'Menunggu' :
-                           req.status === 'approved' ? 'Disetujui' :
-                           req.status === 'paid' ? 'Dibayar' : 'Ditolak'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <Button
-                          onClick={() => setSelectedRequest(req)}
-                          className="bg-muted text-foreground hover:bg-muted/80 h-8 px-3 rounded-lg text-xs font-bold"
-                        >
-                          Detail
-                        </Button>
-                      </td>
+            <>
+              <div className="overflow-x-auto font-sans">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-muted/40 border-b border-border/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      <th className="p-4">Tanggal Pengajuan</th>
+                      <th className="p-4">Distributor</th>
+                      <th className="p-4">Informasi Rekening</th>
+                      <th className="p-4 text-right">Jumlah</th>
+                      <th className="p-4 text-center">Status</th>
+                      <th className="p-4 text-center">Tindakan</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border/20 font-bold">
+                    {paginatedRequests.map((req) => (
+                      <tr key={req.id} className="hover:bg-muted/10">
+                        <td className="p-4 text-muted-foreground font-mono">
+                          {req.requested_at.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                        </td>
+                        <td className="p-4 text-foreground font-black">
+                          {req.distributor_name}
+                        </td>
+                        <td className="p-4 text-foreground text-xs leading-normal">
+                          <div className="flex items-center gap-1 font-black text-muted-foreground uppercase text-[10px]">
+                            <Building size={10} /> {req.bank_name}
+                          </div>
+                          <div className="font-mono mt-0.5">{req.bank_account_number}</div>
+                          <div className="text-[10px] text-muted-foreground">a.n. {req.bank_account_holder}</div>
+                        </td>
+                        <td className="p-4 text-right font-mono font-black text-foreground">
+                          Rp {req.amount.toLocaleString('id-ID')}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-full border ${
+                            req.status === 'pending_review' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                            req.status === 'approved' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                            req.status === 'paid' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
+                            "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                          }`}>
+                            {req.status === 'pending_review' ? 'Menunggu' :
+                             req.status === 'approved' ? 'Disetujui' :
+                             req.status === 'paid' ? 'Dibayar' : 'Ditolak'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <Button
+                            onClick={() => setSelectedRequest(req)}
+                            className="bg-muted text-foreground hover:bg-muted/80 h-8 px-3 rounded-lg text-xs font-bold"
+                          >
+                            Detail
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-4 pb-2 border-t border-border/10">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={filteredRequests.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            </>
           )}
         </div>
       )}

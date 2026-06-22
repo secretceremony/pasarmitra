@@ -22,6 +22,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
 import { formatDateTime } from '../../../lib/dateUtils';
+import { Pagination } from '../../../components/common/Pagination';
 
 interface AuditLog {
   id: string;
@@ -48,6 +49,11 @@ export const AuditLogSystem = () => {
   
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedModule, selectedStatus]);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -174,6 +180,13 @@ export const AuditLogSystem = () => {
 
     return matchesSearch && matchesModule && matchesStatus;
   });
+
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const handleViewDetail = (log: AuditLog) => {
     setSelectedLog(log);
@@ -385,7 +398,7 @@ export const AuditLogSystem = () => {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log, i) => {
+                paginatedLogs.map((log, i) => {
                   const normStatus = getNormalizedStatus(log.status);
                   return (
                     <motion.tr 
@@ -456,24 +469,23 @@ export const AuditLogSystem = () => {
         </div>
 
         {/* Pagination Overlay */}
-        <div className="p-8 border-t border-border/50 bg-muted/5 flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs font-black text-muted-foreground uppercase tracking-widest">
-            <span className="flex items-center gap-2"><Database size={14} /> Retensi Log: 365 Hari</span>
-            <span className="w-px h-4 bg-border" />
-            <span className="text-emerald-500 flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              Perekaman Langsung Aktif
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" disabled className="h-10 px-4 rounded-xl border-border bg-card text-xs font-black opacity-50 cursor-not-allowed">
-              <ChevronLeft size={16} className="mr-2" /> Seb.
-            </Button>
-            <span className="text-xs font-black text-muted-foreground">Halaman 1 dari 1</span>
-            <Button variant="outline" disabled className="h-10 px-4 rounded-xl border-border bg-card text-xs font-black opacity-50 cursor-not-allowed">
-              Sel. <ChevronRight size={16} className="ml-2" />
-            </Button>
-          </div>
+        <div className="p-4 border-t border-border/50 bg-muted/5 flex flex-col gap-4">
+           {filteredLogs.length > 0 && (
+              <Pagination
+                 currentPage={currentPage}
+                 totalPages={totalPages}
+                 onPageChange={setCurrentPage}
+                 totalItems={filteredLogs.length}
+                 itemsPerPage={itemsPerPage}
+              />
+           )}
+           <div className="flex items-center justify-between px-2 text-xs font-black text-muted-foreground uppercase tracking-widest flex-wrap gap-2">
+              <span className="flex items-center gap-2"><Database size={14} /> Retensi Log: 365 Hari</span>
+              <span className="text-emerald-500 flex items-center gap-1">
+                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                 Perekaman Langsung Aktif
+              </span>
+           </div>
         </div>
       </div>
 

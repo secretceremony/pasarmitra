@@ -43,6 +43,10 @@ export const ProfileSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Profile Photo Upload States
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
   // Form states
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -90,6 +94,7 @@ export const ProfileSettings = () => {
         setAddress(data.address || '');
         setDescription(data.description || '');
         setProfileDistrict(data.business_district || '');
+        setAvatarUrl(data.avatar_url || '');
 
         // Populate UMKM verification fields if UMKM
         if (data.role === UserRole.UMKM) {
@@ -121,6 +126,125 @@ export const ProfileSettings = () => {
 
     loadProfileData();
   }, [user?.id, setUser]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate original file is an image
+    if (!file.type.startsWith('image/')) {
+      toast.error('File harus berupa gambar (PNG, JPG, JPEG).');
+      return;
+    }
+
+    // Validate original file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ukuran gambar maksimal 2MB.');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    const toastId = toast.loading('Memproses dan mengunggah foto profil...');
+
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 300;
+            const MAX_HEIGHT = 300;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              // Compress as JPEG with 0.6 quality to keep file size low
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+              resolve(dataUrl);
+            } else {
+              reject(new Error('Gagal memproses gambar pada canvas.'));
+            }
+          };
+          img.onerror = () => reject(new Error('Gagal memuat gambar untuk canvas.'));
+          img.src = event.target?.result as string;
+        };
+        reader.onerror = () => reject(new Error('Gagal membaca file.'));
+        reader.readAsDataURL(file);
+      });
+
+      const base64Image = await base64Promise;
+
+      // ENFORCE final compressed output size (max 60KB payload)
+      const approxBytes = Math.round((base64Image.length * 3) / 4);
+      if (approxBytes > 60 * 1024) {
+        throw new Error('Hasil kompresi gambar terlalu besar (maksimal 60KB). Coba gunakan gambar dengan resolusi lebih rendah.');
+      }
+
+      // Update in Firestore
+      const docRef = doc(db, 'profiles', user.id);
+      await updateDoc(docRef, {
+        avatar_url: base64Image,
+        updated_at: new Date().toISOString()
+      });
+
+      // Update in local state and useAuthStore
+      setAvatarUrl(base64Image);
+      setUser({
+        ...user,
+        avatar_url: base64Image
+      });
+
+      toast.success('Foto profil berhasil diperbarui.', { id: toastId });
+    } catch (err: any) {
+      console.error('Gagal mengunggah foto profil:', err);
+      toast.error(err.message || 'Gagal mengunggah foto profil.', { id: toastId });
+    } finally {
+      setIsUploadingPhoto(false);
+      // Reset the file input so selecting the same file triggers onChange again
+      e.target.value = '';
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    if (!user?.id) return;
+    setIsUploadingPhoto(true);
+    const toastId = toast.loading('Menghapus foto profil...');
+    try {
+      const docRef = doc(db, 'profiles', user.id);
+      await updateDoc(docRef, {
+        avatar_url: '',
+        updated_at: new Date().toISOString()
+      });
+      setAvatarUrl('');
+      setUser({
+        ...user,
+        avatar_url: ''
+      });
+      toast.success('Foto profil berhasil dihapus.', { id: toastId });
+    } catch (err: any) {
+      console.error('Gagal menghapus foto profil:', err);
+      toast.error('Gagal menghapus foto profil.', { id: toastId });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const handleApplyUMKMVerification = async () => {
     if (!user?.id) return;
@@ -593,6 +717,60 @@ export const ProfileSettings = () => {
               <User className="text-primary" size={24} />
               Informasi Akun
             </h3>
+
+            {/* Profile Photo Upload Panel */}
+            <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-muted/10 rounded-2xl border border-border/40">
+              <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-primary/10 border border-border flex items-center justify-center shadow-md shrink-0">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Foto Profil" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-3xl sm:text-4xl font-black text-primary select-none">
+                    {user.email[0].toUpperCase()}
+                  </div>
+                )}
+                {isUploadingPhoto && (
+                  <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-2 text-center sm:text-left">
+                <h4 className="font-black text-lg">Foto Profil</h4>
+                <p className="text-xs font-semibold text-muted-foreground leading-relaxed max-w-md">
+                  Pilih file gambar berformat JPG, JPEG, atau PNG dengan ukuran maksimal 2MB. Foto akan otomatis dikompresi agar pas di database.
+                </p>
+                <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-3">
+                  <input
+                    type="file"
+                    id="avatar-upload"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    disabled={isUploadingPhoto || isSaving}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isUploadingPhoto || isSaving}
+                    onClick={() => document.getElementById('avatar-upload')?.click()}
+                    className="h-10 px-4 rounded-xl font-bold text-xs uppercase tracking-wider cursor-pointer flex items-center gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                  >
+                    Pilih Foto
+                  </Button>
+                  {avatarUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={isUploadingPhoto || isSaving}
+                      onClick={handleDeletePhoto}
+                      className="h-10 px-4 rounded-xl font-bold text-xs uppercase tracking-wider text-rose-500 hover:bg-rose-500/10 cursor-pointer"
+                    >
+                      Hapus Foto
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             
             <div className="grid md:grid-cols-2 gap-6">
               {/* Full Name */}

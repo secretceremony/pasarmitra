@@ -27,6 +27,8 @@ import { createAuditLog } from '../services/adminService';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { formatDateTime } from '../../../lib/dateUtils';
+import { Pagination } from '../../../components/common/Pagination';
+import { getAccountStatusLabel as getCentralAccountStatusLabel, getVerificationStatusLabel as getCentralVerificationStatusLabel } from '../../../lib/statusUtils';
 
 const getNormalizedRole = (roleStr: string): 'ADMIN' | 'DISTRIBUTOR' | 'UMKM' => {
   const r = (roleStr || '').trim().toUpperCase();
@@ -67,6 +69,11 @@ export const UserManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filter]);
   const { user: currentUser } = useAuthStore();
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -488,20 +495,11 @@ export const UserManagement = () => {
   };
 
   const getAccountStatusLabel = (user: any) => {
-    if (user.is_active === false) return 'Dihapus';
-    if (user.is_suspended) return 'Ditangguhkan';
-    if (user.is_inactive || user.status === 'INACTIVE') return 'Nonaktif';
-    return 'Aktif';
+    return getCentralAccountStatusLabel(user);
   };
 
   const getVerificationStatusLabel = (user: any) => {
-    if (user.role !== 'DISTRIBUTOR') return '-';
-    
-    const status = (user.verification_status || '').toUpperCase();
-    if (status === 'VERIFIED' || user.is_verified) return 'Terverifikasi';
-    if (status === 'PENDING_REVIEW' || status === 'PENDING') return 'Menunggu Review';
-    if (status === 'REJECTED') return 'Ditolak';
-    return 'Belum Mengajukan';
+    return getCentralVerificationStatusLabel(user);
   };
 
   // Replaced by shared formatDateTime from dateUtils — handles null/invalid gracefully
@@ -574,6 +572,13 @@ export const UserManagement = () => {
     
     return matchesSearch && matchesFilter;
   });
+
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredUsers, currentPage]);
 
   return (
     <div className="space-y-12 w-full max-w-full overflow-hidden px-4 sm:px-0">
@@ -688,7 +693,7 @@ export const UserManagement = () => {
                          </td>
                        </tr>
                     ) : (
-                     filteredUsers.map((user, i) => {
+                     paginatedUsers.map((user, i) => {
                        const roleConfig = getRoleConfig(user.role);
                        const RoleIcon = roleConfig.icon;
                        return (
@@ -725,7 +730,7 @@ export const UserManagement = () => {
                                 <StatusBadge 
                                    type={
                                      getAccountStatusLabel(user) === 'Aktif' ? 'success' :
-                                     getAccountStatusLabel(user) === 'Nonaktif' ? 'neutral' :
+                                     getAccountStatusLabel(user) === 'Tidak Aktif' || getAccountStatusLabel(user) === 'Dihapus' ? 'neutral' :
                                      getAccountStatusLabel(user) === 'Ditangguhkan' ? 'warning' : 'error'
                                    } 
                                    label={getAccountStatusLabel(user)}
@@ -735,7 +740,7 @@ export const UserManagement = () => {
                                 <StatusBadge 
                                    type={
                                      getVerificationStatusLabel(user) === 'Terverifikasi' ? 'success' :
-                                     getVerificationStatusLabel(user) === 'Menunggu Review' ? 'warning' :
+                                     getVerificationStatusLabel(user) === 'Direview' || getVerificationStatusLabel(user) === 'Perlu Revisi' ? 'warning' :
                                      getVerificationStatusLabel(user) === 'Ditolak' ? 'error' : 'neutral'
                                    } 
                                    label={getVerificationStatusLabel(user)}
@@ -810,11 +815,13 @@ export const UserManagement = () => {
              </table>
           </div>
           
-          <div className="p-8 border-t border-border/50 bg-muted/5 flex items-center justify-between">
-             <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">
-                Menampilkan <span className="text-foreground">{filteredUsers.length}</span> dari {users.length} anggota ekosistem
-             </p>
-          </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filteredUsers.length}
+              itemsPerPage={itemsPerPage}
+            />
         </div>
 
         {/* Edit User Modal */}

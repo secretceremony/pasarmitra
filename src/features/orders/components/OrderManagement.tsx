@@ -14,7 +14,8 @@ import { Button } from '../../../components/ui/button';
 import { cn } from '../../../lib/utils';
 import { useAuthStore } from '../../../store/use-auth-store';
 import { Order, orderService } from '../services/orderService';
-import { formatDateTime } from '../../../lib/dateUtils';
+import { formatDateTime, getDateTimeMillis } from '../../../lib/dateUtils';
+import { Pagination } from '../../../components/common/Pagination';
 
 const TABS = [
   { key: 'All', label: 'Semua' },
@@ -97,6 +98,12 @@ export const OrderManagement = () => {
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [updatingOrders, setUpdatingOrders] = useState<Record<string, boolean>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, sortOrder]);
 
   const isBuyer = user?.role === 'UMKM';
   const isDistributor = user?.role === 'DISTRIBUTOR';
@@ -154,19 +161,34 @@ export const OrderManagement = () => {
     }
   };
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesTab = activeTab === 'All' || order.status === activeTab;
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch =
-      (order.order_code || order.id || '').toLowerCase().includes(searchLower) ||
-      (order.buyer_name || '').toLowerCase().includes(searchLower) ||
-      (order.buyer_profile?.organization_name || '').toLowerCase().includes(searchLower) ||
-      (order.distributor_name || '').toLowerCase().includes(searchLower) ||
-      (order.shipping_address || '').toLowerCase().includes(searchLower) ||
-      getItemsSummary(order).toLowerCase().includes(searchLower);
+  const sortedAndFilteredOrders = React.useMemo(() => {
+    const filtered = orders.filter((order) => {
+      const matchesTab = activeTab === 'All' || order.status === activeTab;
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch =
+        (order.order_code || order.id || '').toLowerCase().includes(searchLower) ||
+        (order.buyer_name || '').toLowerCase().includes(searchLower) ||
+        (order.buyer_profile?.organization_name || '').toLowerCase().includes(searchLower) ||
+        (order.distributor_name || '').toLowerCase().includes(searchLower) ||
+        (order.shipping_address || '').toLowerCase().includes(searchLower) ||
+        getItemsSummary(order).toLowerCase().includes(searchLower);
 
-    return matchesTab && matchesSearch;
-  });
+      return matchesTab && matchesSearch;
+    });
+
+    return filtered.sort((a, b) => {
+      const dateA = getDateTimeMillis(a.created_at);
+      const dateB = getDateTimeMillis(b.created_at);
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+  }, [orders, activeTab, searchQuery, sortOrder]);
+
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(sortedAndFilteredOrders.length / itemsPerPage);
+  const paginatedOrders = sortedAndFilteredOrders.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const handleOrderClick = (orderId: string) => {
     if (user?.role === 'UMKM') {
@@ -247,10 +269,16 @@ export const OrderManagement = () => {
             onChange={(event) => setSearchQuery(event.target.value)}
           />
         </div>
-        <Button variant="outline" className="h-10 sm:h-12 rounded-xl border-border bg-card/40 px-5 sm:px-6 font-bold text-xs justify-center w-full sm:w-auto">
-          <Filter size={14} className="mr-2" />
-          Filter
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+            className="h-10 sm:h-12 w-full sm:w-36 rounded-xl border border-border/50 bg-card/60 px-4 text-xs font-bold outline-none focus:border-primary/40 cursor-pointer text-foreground"
+          >
+            <option value="newest">Terbaru</option>
+            <option value="oldest">Terlama</option>
+          </select>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:gap-6 w-full">
@@ -263,7 +291,7 @@ export const OrderManagement = () => {
             <p className="text-lg sm:text-xl font-black">Gagal memuat pesanan.</p>
             <p className="text-xs sm:text-sm font-bold text-muted-foreground">Silakan coba buka halaman ini kembali.</p>
           </div>
-        ) : filteredOrders.length === 0 ? (
+        ) : sortedAndFilteredOrders.length === 0 ? (
           <div className="space-y-4 rounded-2xl sm:rounded-[2.5rem] border border-border/50 bg-card p-12 sm:p-16 text-center">
             <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-xl sm:rounded-2xl bg-muted/40 text-muted-foreground/40">
               <ShoppingBag size={28} className="sm:w-8 sm:h-8" />
@@ -294,7 +322,7 @@ export const OrderManagement = () => {
             )}
           </div>
         ) : (
-          filteredOrders.map((order, index) => {
+          paginatedOrders.map((order, index) => {
             const nextStatus = getNextStatus(order.status);
             const isUpdating = Boolean(updatingOrders[order.id]);
 
@@ -396,13 +424,14 @@ export const OrderManagement = () => {
         )}
       </div>
 
-      {filteredOrders.length > 0 && !isLoading && !error && (
-        <div className="flex flex-col items-center justify-center space-y-2 pb-4 pt-8">
-          <span className="h-1.5 w-1.5 rounded-full bg-border" />
-          <p className="text-center text-xs font-black uppercase tracking-widest text-muted-foreground">
-            Semua pesanan sudah ditampilkan
-          </p>
-        </div>
+      {sortedAndFilteredOrders.length > 0 && !isLoading && !error && (
+         <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={sortedAndFilteredOrders.length}
+            itemsPerPage={itemsPerPage}
+         />
       )}
     </div>
   );

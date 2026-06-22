@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -19,6 +19,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../components/ui/button';
 import { EmptyState } from '../components/common/EmptyState';
+import { Pagination } from '../components/common/Pagination';
 
 interface Profile {
   id: string;
@@ -50,6 +51,11 @@ export default function DistributorsList() {
   const [selectedCity, setSelectedCity] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'products'>('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCity, selectedCategory, sortBy]);
 
   // Fetch distributor profiles
   const { data: profiles = [], isLoading: isLoadingProfiles, error: profilesError, refetch: refetchProfiles } = useQuery({
@@ -374,108 +380,119 @@ export default function DistributorsList() {
           }
         />
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-full"
-        >
-          <AnimatePresence mode="popLayout">
-            {filteredAndSortedDistributors.map((dist) => {
-              const stats = distributorStats[dist.id] || { count: 0, categories: new Set<string>() };
-              const prodCount = stats.count;
-              const catsArray = Array.from(stats.categories);
-              const initials = (dist.organization_name || dist.full_name || 'D').slice(0, 2).toUpperCase();
+        <div className="space-y-8 w-full">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-full"
+          >
+            <AnimatePresence mode="popLayout">
+              {filteredAndSortedDistributors.slice((currentPage - 1) * 10, currentPage * 10).map((dist) => {
+                const stats = distributorStats[dist.id] || { count: 0, categories: new Set<string>() };
+                const prodCount = stats.count;
+                const catsArray = Array.from(stats.categories);
+                const initials = (dist.organization_name || dist.full_name || 'D').slice(0, 2).toUpperCase();
 
-              return (
-                <motion.div
-                  layout
-                  key={dist.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-card border border-border/50 rounded-xl p-4 sm:p-5 hover:border-primary/20 hover:shadow-md transition-all duration-300 shadow-sm flex flex-col justify-between group h-full relative overflow-hidden"
-                >
-                  {/* Decorative verification background glow */}
-                  {dist.is_verified && (
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 blur-[16px] pointer-events-none" />
-                  )}
+                return (
+                  <motion.div
+                    layout
+                    key={dist.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="bg-card border border-border/50 rounded-xl p-4 sm:p-5 hover:border-primary/20 hover:shadow-md transition-all duration-300 shadow-sm flex flex-col justify-between group h-full relative overflow-hidden"
+                  >
+                    {/* Decorative verification background glow */}
+                    {dist.is_verified && (
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 blur-[16px] pointer-events-none" />
+                    )}
 
-                  <div className="space-y-3">
-                    {/* Top Header Row (Avatar, Name, Badge) */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 font-bold text-base shadow-inner shrink-0">
-                        {initials}
+                    <div className="space-y-3">
+                      {/* Top Header Row (Avatar, Name, Badge) */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 font-bold text-base shadow-inner shrink-0">
+                          {initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <h3 className="font-bold text-sm sm:text-base text-foreground leading-tight group-hover:text-primary transition-colors break-words">
+                              {dist.organization_name || dist.full_name || 'Distributor Mitra'}
+                            </h3>
+                            {dist.is_verified && (
+                              <ShieldCheck size={14} className="text-primary shrink-0" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-semibold mt-0.5">
+                            <MapPin size={11} className="shrink-0 text-primary/60" />
+                            <span className="break-words line-clamp-1">
+                              {dist.business_district || dist.address || 'Balikpapan, Kalimantan Timur'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <h3 className="font-bold text-sm sm:text-base text-foreground leading-tight group-hover:text-primary transition-colors break-words">
-                            {dist.organization_name || dist.full_name || 'Distributor Mitra'}
-                          </h3>
-                          {dist.is_verified && (
-                            <ShieldCheck size={14} className="text-primary shrink-0" />
+
+                      {/* Description */}
+                      <p className="text-xs font-medium text-muted-foreground/80 leading-relaxed min-h-[2.5rem] line-clamp-2">
+                        {dist.description || 'Penyedia kebutuhan sembako grosir terpercaya dan mitra logistik terdaftar di PasarMitra.'}
+                      </p>
+
+                      {/* Stats badges */}
+                      <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-border/30">
+                        <div className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded text-[10px] font-bold text-muted-foreground">
+                          <Package size={11} className="text-primary/60" />
+                          <span>{prodCount} Produk</span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded text-[10px] font-bold text-muted-foreground">
+                          <Star size={11} className="text-amber-500 fill-amber-500" />
+                          <span>{dist.reputation_score ? dist.reputation_score.toFixed(1) : '4.7'}</span>
+                        </div>
+                      </div>
+
+                      {/* Categories list */}
+                      {catsArray.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {catsArray.slice(0, 3).map((cat) => (
+                            <span
+                              key={cat}
+                              className="bg-primary/5 text-primary border border-primary/10 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wider"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                          {catsArray.length > 3 && (
+                            <span className="bg-muted/40 text-muted-foreground rounded-full px-1.5 py-0.5 text-[8px] font-bold">
+                              +{catsArray.length - 3}
+                            </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-semibold mt-0.5">
-                          <MapPin size={11} className="shrink-0 text-primary/60" />
-                          <span className="break-words line-clamp-1">
-                            {dist.business_district || dist.address || 'Balikpapan, Kalimantan Timur'}
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
-                    {/* Description */}
-                    <p className="text-xs font-medium text-muted-foreground/80 leading-relaxed min-h-[2.5rem] line-clamp-2">
-                      {dist.description || 'Penyedia kebutuhan sembako grosir terpercaya dan mitra logistik terdaftar di PasarMitra.'}
-                    </p>
-
-                    {/* Stats badges */}
-                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-border/30">
-                      <div className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded text-[10px] font-bold text-muted-foreground">
-                        <Package size={11} className="text-primary/60" />
-                        <span>{prodCount} Produk</span>
-                      </div>
-                      <div className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded text-[10px] font-bold text-muted-foreground">
-                        <Star size={11} className="text-amber-500 fill-amber-500" />
-                        <span>{dist.reputation_score ? dist.reputation_score.toFixed(1) : '4.7'}</span>
-                      </div>
+                    {/* Actions */}
+                    <div className="pt-3">
+                      <Button
+                        onClick={() => navigate(`/distributor/${dist.id}`)}
+                        className="w-full h-8.5 rounded-lg bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider shadow-sm shadow-primary/15 group-hover:scale-[1.01] transition-all cursor-pointer"
+                      >
+                        Lihat Profil
+                      </Button>
                     </div>
-
-                    {/* Categories list */}
-                    {catsArray.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-0.5">
-                        {catsArray.slice(0, 3).map((cat) => (
-                          <span
-                            key={cat}
-                            className="bg-primary/5 text-primary border border-primary/10 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wider"
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                        {catsArray.length > 3 && (
-                          <span className="bg-muted/40 text-muted-foreground rounded-full px-1.5 py-0.5 text-[8px] font-bold">
-                            +{catsArray.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-3">
-                    <Button
-                      onClick={() => navigate(`/distributor/${dist.id}`)}
-                      className="w-full h-8.5 rounded-lg bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider shadow-sm shadow-primary/15 group-hover:scale-[1.01] transition-all cursor-pointer"
-                    >
-                      Lihat Profil
-                    </Button>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </motion.div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
+          {filteredAndSortedDistributors.length > 10 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredAndSortedDistributors.length / 10)}
+              onPageChange={setCurrentPage}
+              totalItems={filteredAndSortedDistributors.length}
+              itemsPerPage={10}
+            />
+          )}
+        </div>
       )}
     </div>
   );

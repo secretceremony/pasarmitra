@@ -92,7 +92,17 @@ export default function Cart() {
                     >
                       <div className="w-full sm:w-28 h-28 rounded-xl sm:rounded-2xl bg-muted overflow-hidden shrink-0 border border-border shadow-md">
                         {item.image_url ? (
-                          <img src={item.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.name} />
+                          <img 
+                            src={item.image_url} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                            alt={item.name} 
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (target.src !== '/assets/fallback-product.png') {
+                                target.src = '/assets/fallback-product.png';
+                              }
+                            }}
+                          />
                         ) : (
                           <div className="w-full h-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xs uppercase">
                             Tidak ada gambar
@@ -103,9 +113,13 @@ export default function Cart() {
                         <div className="flex justify-between items-start gap-4">
                           <div>
                             <h4 className="font-black text-base sm:text-lg line-clamp-1 group-hover:text-primary transition-colors">{item.name}</h4>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">Satuan: {item.unit_type || 'Unit'}</p>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                              <span>Satuan: {item.unit_type || 'Unit'}</span>
+                              <span className="text-border">•</span>
+                              <span>Harga: Rp{item.price.toLocaleString('id-ID')}</span>
+                            </div>
                           </div>
-                          <button onClick={() => removeItem(item.id)} className="text-muted-foreground hover:text-rose-500 transition-colors p-1.5 bg-muted/40 rounded-lg shrink-0 cursor-pointer">
+                          <button onClick={() => removeItem(item.id)} className="text-muted-foreground hover:text-rose-500 transition-colors p-1.5 bg-muted/40 rounded-lg shrink-0 cursor-pointer border-none bg-transparent">
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -114,7 +128,7 @@ export default function Cart() {
                           <div className="flex items-center gap-3 bg-muted/40 p-1 rounded-xl border border-border/30">
                             <button 
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-all text-foreground cursor-pointer"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-all text-foreground cursor-pointer border-none bg-transparent"
                             >
                               <Minus size={14} />
                             </button>
@@ -126,14 +140,14 @@ export default function Cart() {
                                   toast.error("Jumlah melebihi stok tersedia.");
                                 }
                               }}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-all text-primary font-black cursor-pointer"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-all text-primary font-black cursor-pointer border-none bg-transparent"
                             >
                               <Plus size={14} />
                             </button>
                           </div>
                           <div className="text-right">
                             <p className="text-[10px] font-bold text-muted-foreground uppercase">Subtotal</p>
-                            <p className="font-black text-lg sm:text-xl">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</p>
+                            <p className="font-black text-lg sm:text-xl">Rp{(item.price * item.quantity).toLocaleString('id-ID')}</p>
                           </div>
                         </div>
                       </div>
@@ -154,24 +168,24 @@ export default function Cart() {
             
             <div className="space-y-4">
               <div className="flex justify-between items-center text-white/70 font-bold text-xs uppercase tracking-wider">
-                <span>Total Barang</span>
-                <span className="text-white font-black">{totalItems()} Unit</span>
+                <span>Subtotal Produk</span>
+                <span className="text-white font-black">Rp{totalPrice().toLocaleString('id-ID')}</span>
               </div>
               <div className="flex justify-between items-center text-white/70 font-bold text-xs uppercase tracking-wider">
-                <span>Pajak (PPN B2B)</span>
-                <span className="text-emerald-400 font-black">Rp 0 (Exempt)</span>
+                <span>Biaya Layanan</span>
+                <span className="text-emerald-400 font-black">Rp0</span>
               </div>
               <div className="flex justify-between items-center text-white/70 font-bold text-xs uppercase tracking-wider">
-                <span>Biaya Admin</span>
-                <span className="text-emerald-400 font-black">Gratis</span>
+                <span>Ongkir / Estimasi Pengiriman</span>
+                <span className="text-emerald-400 font-black">Rp0</span>
               </div>
               
               <hr className="border-white/10" />
 
               <div className="space-y-2 pt-2">
-                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Total Nilai Pengadaan</p>
-                <p className="text-2xl sm:text-3xl font-black text-white tracking-tighter">
-                  Rp {totalPrice().toLocaleString('id-ID')}
+                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Total Pembayaran</p>
+                <p className="text-3xl sm:text-4xl font-black text-white tracking-tighter">
+                  Rp{totalPrice().toLocaleString('id-ID')}
                 </p>
               </div>
             </div>

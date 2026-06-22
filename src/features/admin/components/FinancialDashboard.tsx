@@ -14,12 +14,14 @@ import {
   Clock,
   ShieldCheck,
   ChevronLeft,
-  AlertCircle
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Button } from '../../../components/ui/button';
 import { formatDateTime } from '../../../lib/dateUtils';
+import { Pagination } from '../../../components/common/Pagination';
 import { 
   AreaChart, 
   Area, 
@@ -57,6 +59,12 @@ export const FinancialDashboard = () => {
   const [revenueBreakdown, setRevenueBreakdown] = useState<{ name: string; value: number; color: string }[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
   const [globalBaseline, setGlobalBaseline] = useState<number>(0.05); // Default 5%
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -391,10 +399,20 @@ export const FinancialDashboard = () => {
           {/* Payment History Table */}
           <div className="bg-card border border-border/50 rounded-[3rem] overflow-hidden shadow-xl">
              <div className="p-8 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between sm:items-center">
-                <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                <h3 className="text-2xl font-black tracking-tight flex items-center gap-3 shrink-0">
                    <CreditCard className="text-primary" size={24} />
                    Riwayat Pembayaran Terbaru
                 </h3>
+                <div className="relative group w-full sm:w-72">
+                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                   <input
+                     type="text"
+                     placeholder="Cari referensi atau penerima..."
+                     value={searchQuery}
+                     onChange={(e) => setSearchQuery(e.target.value)}
+                     className="w-full h-10 bg-muted/40 border border-border/30 pl-10 pr-4 rounded-xl text-xs font-bold outline-none focus:border-primary/40 focus:bg-card transition-all font-sans text-foreground"
+                   />
+                </div>
              </div>
              <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[800px]">
@@ -409,69 +427,117 @@ export const FinancialDashboard = () => {
                          <th className="px-10 py-6 text-right">Aksi</th>
                       </tr>
                    </thead>
-                   <tbody className="divide-y divide-border/30">
-                       {payments.length === 0 ? (
-                          <tr>
-                             <td colSpan={7} className="py-16 text-center">
-                                <div className="flex flex-col items-center justify-center gap-3">
-                                  <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground/40 mx-auto">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p className="text-sm font-black text-foreground">Belum ada data pembayaran.</p>
-                                    <p className="text-xs font-medium text-muted-foreground">Data akan muncul setelah transaksi atau payout distributor tercatat di sistem.</p>
-                                  </div>
-                                </div>
-                             </td>
-                          </tr>
-                      ) : (
-                         payments.map((row, i) => (
-                           <tr key={i} className="hover:bg-primary/5 transition-all group">
-                              <td className="px-10 py-6 text-sm font-bold text-muted-foreground">{row.timestamp}</td>
-                              <td className="px-10 py-6 font-mono text-xs text-muted-foreground">{row.reference}</td>
-                              <td className="px-10 py-6">
-                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary font-black italic text-xs">
-                                       {row.recipient ? row.recipient[0] : 'P'}
+                    <tbody className="divide-y divide-border/30">
+                        {(() => {
+                           const filteredPayments = payments.filter((row) => {
+                              const term = searchQuery.toLowerCase().trim();
+                              if (!term) return true;
+                              return (
+                                 (row.reference && row.reference.toLowerCase().includes(term)) ||
+                                 (row.recipient && row.recipient.toLowerCase().includes(term)) ||
+                                 (row.type && row.type.toLowerCase().includes(term))
+                              );
+                           });
+                           const itemsPerPage = 10;
+                           const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+                           const paginatedPayments = filteredPayments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+                           if (filteredPayments.length === 0) {
+                              return (
+                                 <tr>
+                                    <td colSpan={7} className="py-16 text-center">
+                                       <div className="flex flex-col items-center justify-center gap-3">
+                                         <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground/40 mx-auto">
+                                           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+                                         </div>
+                                         <div className="space-y-1">
+                                           <p className="text-sm font-black text-foreground">
+                                             {searchQuery ? "Tidak ada hasil pencarian yang cocok." : "Belum ada data pembayaran."}
+                                           </p>
+                                           <p className="text-xs font-medium text-muted-foreground">
+                                             {searchQuery ? "Coba kata kunci pencarian yang lain." : "Data akan muncul setelah transaksi atau payout distributor tercatat di sistem."}
+                                           </p>
+                                         </div>
+                                       </div>
+                                    </td>
+                                 </tr>
+                              );
+                           }
+
+                           return paginatedPayments.map((row, i) => (
+                              <tr key={i} className="hover:bg-primary/5 transition-all group">
+                                 <td className="px-10 py-6 text-sm font-bold text-muted-foreground">{row.timestamp}</td>
+                                 <td className="px-10 py-6 font-mono text-xs text-muted-foreground">{row.reference}</td>
+                                 <td className="px-10 py-6">
+                                    <div className="flex items-center gap-3">
+                                       <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary font-black italic text-xs">
+                                          {row.recipient ? row.recipient[0] : 'P'}
+                                       </div>
+                                       <span className="text-sm font-bold group-hover:text-primary transition-colors">{row.recipient}</span>
                                     </div>
-                                    <span className="text-sm font-bold group-hover:text-primary transition-colors">{row.recipient}</span>
-                                 </div>
-                              </td>
-                              <td className="px-10 py-6 text-xs font-black uppercase tracking-wider text-foreground">{row.type}</td>
-                              <td className="px-10 py-6 text-right font-black italic text-md text-foreground">{formatCurrency(row.amount)}</td>
-                              <td className="px-10 py-6">
-                                 <div className={cn(
-                                   "flex items-center gap-2 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest w-fit border",
-                                   row.status === 'SUCCESS' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : 
-                                   row.status === 'PENDING' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : 
-                                   "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                                 )}>
-                                    <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", 
-                                      row.status === 'SUCCESS' ? "bg-emerald-500" : 
-                                      row.status === 'PENDING' ? "bg-amber-500" : 
-                                      "bg-rose-500"
-                                    )} />
-                                    {row.status === 'SUCCESS' ? 'SUKSES' : row.status === 'PENDING' ? 'TERTUNDA' : 'GAGAL'}
-                                 </div>
-                              </td>
-                              <td className="px-10 py-6 text-right">
-                                 <Button 
-                                   variant="ghost" 
-                                   size="sm"
-                                   onClick={() => { setSelectedPayment(row); setIsPaymentModalOpen(true); }}
-                                   className="text-xs font-bold text-primary hover:bg-primary/5 rounded-lg px-3 py-1 cursor-pointer"
-                                 >
-                                    Detail
-                                 </Button>
-                              </td>
-                           </tr>
-                         ))
-                      )}
-                   </tbody>
-                </table>
-             </div>
-          </div>
-        </>
+                                 </td>
+                                 <td className="px-10 py-6 text-xs font-black uppercase tracking-wider text-foreground">{row.type}</td>
+                                 <td className="px-10 py-6 text-right font-black italic text-md text-foreground">{formatCurrency(row.amount)}</td>
+                                 <td className="px-10 py-6">
+                                    <div className={cn(
+                                      "flex items-center gap-2 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest w-fit border",
+                                      row.status === 'SUCCESS' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : 
+                                      row.status === 'PENDING' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : 
+                                      "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                    )}>
+                                       <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", 
+                                         row.status === 'SUCCESS' ? "bg-emerald-500" : 
+                                         row.status === 'PENDING' ? "bg-amber-500" : 
+                                         "bg-rose-500"
+                                       )} />
+                                       {row.status === 'SUCCESS' ? 'SUKSES' : row.status === 'PENDING' ? 'TERTUNDA' : 'GAGAL'}
+                                    </div>
+                                 </td>
+                                 <td className="px-10 py-6 text-right">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => { setSelectedPayment(row); setIsPaymentModalOpen(true); }}
+                                      className="text-xs font-bold text-primary hover:bg-primary/5 rounded-lg px-3 py-1 cursor-pointer"
+                                    >
+                                       Detail
+                                    </Button>
+                                 </td>
+                              </tr>
+                           ));
+                        })()}
+                    </tbody>
+                 </table>
+              </div>
+              {(() => {
+                 const filteredPayments = payments.filter((row) => {
+                    const term = searchQuery.toLowerCase().trim();
+                    if (!term) return true;
+                    return (
+                       (row.reference && row.reference.toLowerCase().includes(term)) ||
+                       (row.recipient && row.recipient.toLowerCase().includes(term)) ||
+                       (row.type && row.type.toLowerCase().includes(term))
+                    );
+                 });
+                 const itemsPerPage = 10;
+                 const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+                 if (filteredPayments.length > 0) {
+                    return (
+                       <div className="px-8 pb-4">
+                          <Pagination
+                             currentPage={currentPage}
+                             totalPages={totalPages}
+                             onPageChange={setCurrentPage}
+                             totalItems={filteredPayments.length}
+                             itemsPerPage={itemsPerPage}
+                          />
+                       </div>
+                    );
+                 }
+                  return null;
+               })()}
+            </div>
+         </>
       )}
 
       {/* Invoice Receipt Modal */}

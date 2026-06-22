@@ -19,10 +19,11 @@ export const SUPPLIER_TIER_CONFIG = {
 };
 
 export const MARKETPLACE_SORT_OPTIONS = [
-  { id: 'relativity', label: 'Paling Sesuai' },
+  { id: 'best_match', label: 'Paling Sesuai' },
   { id: 'price_asc', label: 'Harga: Terendah ke Tertinggi' },
   { id: 'price_desc', label: 'Harga: Tertinggi ke Terendah' },
-  { id: 'rating', label: 'Rating Tertinggi' }
+  { id: 'rating', label: 'Rating Tertinggi' },
+  { id: 'newest', label: 'Terbaru' }
 ];
 
 export const MARKETPLACE_UI_STRINGS = {

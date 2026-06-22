@@ -30,26 +30,42 @@ const testUsers = [
       role: 'ADMIN',
       full_name: 'System Admin',
       is_verified: true,
+      is_active: true,
+      is_suspended: false,
     }
   },
   {
-    email: 'distributor@pasarmitra.com',
+    email: 'distributor-sembako@pasarmitra.com',
     password: 'password123',
     profile: {
       role: 'DISTRIBUTOR',
       full_name: 'Budi Santoso',
-      organization_name: 'Distributor Sembako Utama',
+      organization_name: 'PT Sembako Nusantara Utama',
+      business_type: 'Sembako',
       is_verified: true,
+      verification_status: 'VERIFIED',
+      is_active: true,
+      is_suspended: false,
+      address: 'Jl. Ahmad Yani No. 12, Balikpapan Tengah, Balikpapan',
+      reputation_score: 4.8,
+      phone: '081234567801',
+      description: 'Penyedia kebutuhan sembako terlengkap untuk UMKM di Balikpapan.'
     }
   },
   {
-    email: 'umkm@pasarmitra.com',
+    email: 'umkm-warungmakan@pasarmitra.com',
     password: 'password123',
     profile: {
       role: 'UMKM',
       full_name: 'Siti Aminah',
-      organization_name: 'Warung Sejahtera',
-      is_verified: true,
+      organization_name: 'Warung Nasi Bu Susi',
+      business_type: 'Warung Makan',
+      is_active: true,
+      is_suspended: false,
+      address: 'Jl. Syarifuddin Yoes No. 42, Balikpapan Selatan, Balikpapan',
+      reputation_score: 4.6,
+      phone: '085234567901',
+      description: 'Warung makan sederhana menyajikan masakan khas Jawa.'
     }
   }
 ];

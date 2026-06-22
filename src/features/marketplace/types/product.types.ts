@@ -11,4 +11,5 @@ export interface MarketplaceProduct {
   distributor: string;
   distributorId: string;
   stock?: number;
+  created_at?: any;
 }

@@ -23,6 +23,7 @@ import { createAuditLog } from '../services/adminService';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { Pagination } from '../../../components/common/Pagination';
 
 export const ModerationSystem = () => {
   const navigate = useNavigate();
@@ -36,6 +37,11 @@ export const ModerationSystem = () => {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<any | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, activeTab, showResolved]);
 
   const fetchModerationItems = async () => {
     try {
@@ -507,6 +513,13 @@ export const ModerationSystem = () => {
     return 0;
   });
 
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(sortedFilteredItems.length / itemsPerPage);
+  const paginatedItems = sortedFilteredItems.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="space-y-6 md:space-y-8 w-full max-w-full overflow-hidden px-4 sm:px-0">
       {/* Breadcrumb */}
@@ -668,7 +681,7 @@ export const ModerationSystem = () => {
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
-                       {sortedFilteredItems.map((item, i) => {
+                       {paginatedItems.map((item, i) => {
                           const resolved = isItemResolved(item);
                           const isProduct = (item.targetType ?? item.type)?.toUpperCase() === 'PRODUCT';
                           return (
@@ -862,7 +875,7 @@ export const ModerationSystem = () => {
 
              {/* Mobile Stacked Card View for List Mode */}
              <div className="block md:hidden divide-y divide-border/20">
-                {sortedFilteredItems.map((item, i) => {
+                {paginatedItems.map((item, i) => {
                    const resolved = isItemResolved(item);
                    const isProduct = (item.targetType ?? item.type)?.toUpperCase() === 'PRODUCT';
                    return (
@@ -1069,7 +1082,7 @@ export const ModerationSystem = () => {
           </div>
         ) : (
           <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-             {sortedFilteredItems.map((item, i) => {
+             {paginatedItems.map((item, i) => {
                 const resolved = isItemResolved(item);
                 const isProduct = (item.targetType ?? item.type)?.toUpperCase() === 'PRODUCT';
                 return (
@@ -1268,6 +1281,15 @@ export const ModerationSystem = () => {
              })}
           </div>
         )
+      )}
+      {sortedFilteredItems.length > 0 && (
+         <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={sortedFilteredItems.length}
+            itemsPerPage={itemsPerPage}
+         />
       )}
       {/* Custom Details Modal */}
       {detailItem && (

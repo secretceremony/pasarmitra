@@ -30,6 +30,7 @@ import { orderService } from '../../orders/services/orderService';
 import { Button } from '../../../components/ui/button';
 import { cn } from '../../../lib/utils';
 import { toast } from 'sonner';
+import { Pagination } from '../../../components/common/Pagination';
 
 export const DistributorWallet = () => {
   const { user } = useAuthStore();
@@ -49,6 +50,13 @@ export const DistributorWallet = () => {
   const [activeTab, setActiveTab] = useState<'transactions' | 'payouts'>('transactions');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [txPage, setTxPage] = useState(1);
+  const [payoutPage, setPayoutPage] = useState(1);
+
+  useEffect(() => {
+    setTxPage(1);
+    setPayoutPage(1);
+  }, [activeTab]);
   
   // Payout Form Fields
   const [amount, setAmount] = useState('');
@@ -254,6 +262,13 @@ export const DistributorWallet = () => {
     }
   };
 
+  const itemsPerPage = 10;
+  const txTotalPages = Math.ceil(transactions.length / itemsPerPage);
+  const paginatedTransactions = transactions.slice((txPage - 1) * itemsPerPage, txPage * itemsPerPage);
+
+  const payoutTotalPages = Math.ceil(payoutRequests.length / itemsPerPage);
+  const paginatedPayoutRequests = payoutRequests.slice((payoutPage - 1) * itemsPerPage, payoutPage * itemsPerPage);
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-4 py-6">
       {/* Breadcrumb */}
@@ -401,7 +416,8 @@ export const DistributorWallet = () => {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-muted/40 border-b border-border/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -414,7 +430,7 @@ export const DistributorWallet = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20 font-bold">
-                  {transactions.map((tx) => (
+                  {paginatedTransactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-muted/10">
                       <td className="p-4 text-muted-foreground font-mono">
                         {tx.created_at.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
@@ -452,6 +468,18 @@ export const DistributorWallet = () => {
                 </tbody>
               </table>
             </div>
+            {transactions.length > 0 && (
+               <div className="px-4 pb-2 border-t border-border/10 bg-card">
+                  <Pagination
+                     currentPage={txPage}
+                     totalPages={txTotalPages}
+                     onPageChange={setTxPage}
+                     totalItems={transactions.length}
+                     itemsPerPage={itemsPerPage}
+                  />
+               </div>
+            )}
+            </>
           )}
         </div>
       ) : (
@@ -461,7 +489,8 @@ export const DistributorWallet = () => {
               Belum ada riwayat pengajuan pencairan.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-muted/40 border-b border-border/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -473,7 +502,7 @@ export const DistributorWallet = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20 font-bold">
-                  {payoutRequests.map((req) => (
+                  {paginatedPayoutRequests.map((req) => (
                     <tr key={req.id} className="hover:bg-muted/10">
                       <td className="p-4 text-muted-foreground font-mono">
                         {req.requested_at.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
@@ -509,6 +538,18 @@ export const DistributorWallet = () => {
                 </tbody>
               </table>
             </div>
+            {payoutRequests.length > 0 && (
+               <div className="px-4 pb-2 border-t border-border/10 bg-card">
+                  <Pagination
+                     currentPage={payoutPage}
+                     totalPages={payoutTotalPages}
+                     onPageChange={setPayoutPage}
+                     totalItems={payoutRequests.length}
+                     itemsPerPage={itemsPerPage}
+                  />
+               </div>
+            )}
+            </>
           )}
         </div>
       )}

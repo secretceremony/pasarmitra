@@ -358,6 +358,12 @@ export function ProductDetailPage() {
               src={product.image_url || '/assets/fallback-product.png'} 
               className="w-full h-full object-cover" 
               alt={product.name} 
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== '/assets/fallback-product.png') {
+                  target.src = '/assets/fallback-product.png';
+                }
+              }}
             />
           </div>
         </div>
